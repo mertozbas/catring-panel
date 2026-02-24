@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: catring-panel
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python database/migrate.py && gunicorn "app:create_app()" --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "False"
+      - key: TELEGRAM_BOT_TOKEN
+        value: ""
+      - key: GOOGLE_MAPS_API_KEY
+        value: ""
