@@ -11,6 +11,8 @@
         </form>
     </div>
     <div class="toolbar-right">
+        <a href="{{ url_for('customers.csv_template') }}" class="btn btn-outline" title="CSV Şablonu İndir">&#128196; Şablon</a>
+        <button class="btn btn-secondary" onclick="openModal('importCsvModal')">&#128229; CSV İçe Aktar</button>
         <button class="btn btn-primary" onclick="openModal('addCustomerModal')">+ Yeni Müşteri</button>
     </div>
 </div>
@@ -23,9 +25,9 @@
                 <thead>
                     <tr>
                         <th>Firma Adı</th>
+                        <th>Segment</th>
                         <th>İletişim</th>
                         <th>Telefon</th>
-                        <th>Vars. Çeşit</th>
                         <th>Vars. Kap</th>
                         <th>Vars. Porsiyon</th>
                         <th>Özel Not</th>
@@ -36,19 +38,26 @@
                     {% for c in customers %}
                     <tr>
                         <td><strong>{{ c.name }}</strong></td>
+                        <td>
+                            {% if c.segment == 'vip' %}<span class="badge" style="background:gold;color:#333;">VIP</span>
+                            {% elif c.segment == 'yeni' %}<span class="badge" style="background:#3498db;color:#fff;">Yeni</span>
+                            {% else %}<span class="badge" style="background:#ecf0f1;color:#666;">Normal</span>{% endif %}
+                        </td>
                         <td>{{ c.contact_name or '-' }}</td>
                         <td>{{ c.phone or '-' }}</td>
-                        <td>{{ c.default_variety_count }}</td>
                         <td><span class="badge badge-{{ c.default_container_type }}">{{ c.default_container_type | replace('_', ' ') | title }}</span></td>
                         <td>{{ c.default_portion_count or '-' }}</td>
                         <td>{% if c.special_notes %}<span class="note-highlight">{{ c.special_notes }}</span>{% endif %}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline" onclick="editCustomer({{ c.id }}, '{{ c.name }}', '{{ c.contact_name or '' }}', '{{ c.phone or '' }}', '{{ c.telegram_chat_id or '' }}', '{{ c.address or '' }}', '{{ c.latitude or '' }}', '{{ c.longitude or '' }}', {{ c.default_variety_count }}, '{{ c.default_container_type }}', '{{ c.default_portion_count or '' }}', '{{ c.special_notes or '' }}')">Düzenle</button>
-                            {% if c.is_active %}
-                            <a href="{{ url_for('customers.toggle', customer_id=c.id, active=0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Pasif yapmak istediğinize emin misiniz?')">Pasif</a>
-                            {% else %}
-                            <a href="{{ url_for('customers.toggle', customer_id=c.id, active=1) }}" class="btn btn-sm btn-success">Aktif</a>
-                            {% endif %}
+                            <div style="display:flex;gap:4px;">
+                                <a href="{{ url_for('customers.history', customer_id=c.id) }}" class="btn btn-sm btn-outline" title="Geçmiş" style="padding:3px 8px;">&#128196;</a>
+                                <button class="btn btn-sm btn-outline" onclick="editCustomer({{ c.id }}, '{{ c.name }}', '{{ c.contact_name or '' }}', '{{ c.phone or '' }}', '{{ c.telegram_chat_id or '' }}', '{{ (c.address or '')|replace("'", "\\'") }}', '{{ c.latitude or '' }}', '{{ c.longitude or '' }}', {{ c.default_variety_count }}, '{{ c.default_container_type }}', '{{ c.default_portion_count or '' }}', '{{ (c.special_notes or '')|replace("'", "\\'") }}', '{{ c.segment or 'normal' }}', '{{ c.unit_price or '' }}')" style="padding:3px 8px;">&#9998;</button>
+                                {% if c.is_active %}
+                                <a href="{{ url_for('customers.toggle', customer_id=c.id, active=0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Pasif yapmak istediğinize emin misiniz?')" style="padding:3px 8px;">&#10005;</a>
+                                {% else %}
+                                <a href="{{ url_for('customers.toggle', customer_id=c.id, active=1) }}" class="btn btn-sm btn-success" style="padding:3px 8px;">&#10003;</a>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -72,6 +81,7 @@
             <button class="modal-close" onclick="closeModal('addCustomerModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('customers.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -137,6 +147,20 @@
                     <label>Özel Notlar</label>
                     <textarea name="special_notes" class="form-control" placeholder="Bol kepçe, çorbalı bol vb."></textarea>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Segment</label>
+                        <select name="segment" class="form-control">
+                            <option value="normal">Normal</option>
+                            <option value="vip">VIP</option>
+                            <option value="yeni">Yeni</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Birim Fiyat (TL)</label>
+                        <input type="number" step="0.01" name="unit_price" class="form-control" placeholder="0.00">
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('addCustomerModal')">İptal</button>
@@ -154,6 +178,7 @@
             <button class="modal-close" onclick="closeModal('editCustomerModal')">&times;</button>
         </div>
         <form method="POST" id="editForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -219,6 +244,20 @@
                     <label>Özel Notlar</label>
                     <textarea name="special_notes" id="edit_notes" class="form-control"></textarea>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Segment</label>
+                        <select name="segment" id="edit_segment" class="form-control">
+                            <option value="normal">Normal</option>
+                            <option value="vip">VIP</option>
+                            <option value="yeni">Yeni</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Birim Fiyat (TL)</label>
+                        <input type="number" step="0.01" name="unit_price" id="edit_unit_price" class="form-control">
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('editCustomerModal')">İptal</button>
@@ -228,8 +267,40 @@
     </div>
 </div>
 
+<!-- CSV Import Modal -->
+<div class="modal-overlay" id="importCsvModal">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-header">
+            <h3>CSV'den Müşteri İçe Aktar</h3>
+            <button class="modal-close" onclick="closeModal('importCsvModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('customers.import_csv') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-body">
+                <p style="font-size:13px;color:#666;margin-bottom:15px;">
+                    CSV dosyası ile toplu müşteri ekleyin. Önce
+                    <a href="{{ url_for('customers.csv_template') }}">şablonu indirin</a>
+                    ve doldurun.
+                </p>
+                <div class="form-group">
+                    <label>CSV Dosyası *</label>
+                    <input type="file" name="csv_file" accept=".csv" class="form-control" required>
+                </div>
+                <div style="font-size:12px;color:#999;background:var(--bg);padding:10px;border-radius:var(--radius);">
+                    <strong>Beklenen kolonlar:</strong><br>
+                    Firma Adı, İletişim Kişisi, Telefon, Adres, Varsayılan Çeşit, Varsayılan Kap, Varsayılan Porsiyon, Özel Notlar, Segment
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('importCsvModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">İçe Aktar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-function editCustomer(id, name, contact, phone, telegram, address, lat, lng, variety, container, portion, notes) {
+function editCustomer(id, name, contact, phone, telegram, address, lat, lng, variety, container, portion, notes, segment, unitPrice) {
     document.getElementById('editForm').action = '/customers/edit/' + id;
     document.getElementById('edit_name').value = name;
     document.getElementById('edit_contact_name').value = contact;
@@ -242,6 +313,8 @@ function editCustomer(id, name, contact, phone, telegram, address, lat, lng, var
     document.getElementById('edit_container').value = container;
     document.getElementById('edit_portion').value = portion;
     document.getElementById('edit_notes').value = notes;
+    document.getElementById('edit_segment').value = segment || 'normal';
+    document.getElementById('edit_unit_price').value = unitPrice || '';
     openModal('editCustomerModal');
 }
 </script>

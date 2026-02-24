@@ -3,9 +3,11 @@ from models.db import query_db, insert_db, update_db, get_db
 
 def get_orders_by_date(date):
     return query_db(
-        '''SELECT o.*, c.name as customer_name, c.default_container_type, c.special_notes as customer_notes
+        '''SELECT o.*, c.name as customer_name, c.default_container_type, c.special_notes as customer_notes,
+                  r.route_name as route_name
            FROM orders o
            JOIN customers c ON o.customer_id = c.id
+           LEFT JOIN routes r ON o.route_id = r.id
            WHERE o.date = ?
            ORDER BY o.route_id, o.delivery_sequence''',
         [date]
@@ -201,4 +203,22 @@ def get_orders_by_status(date_str, status):
            WHERE o.date = ? AND o.status = ?
            ORDER BY o.route_id, o.delivery_sequence''',
         [date_str, status]
+    )
+
+
+def log_order_change(order_id, field_name, old_value, new_value, changed_by=None):
+    """Siparis degisikligini kaydet."""
+    insert_db(
+        '''INSERT INTO order_history (order_id, field_name, old_value, new_value, changed_by)
+           VALUES (?, ?, ?, ?, ?)''',
+        [order_id, field_name, str(old_value) if old_value is not None else None,
+         str(new_value) if new_value is not None else None, changed_by]
+    )
+
+
+def get_order_history(order_id):
+    """Siparis gecmisini getir."""
+    return query_db(
+        '''SELECT * FROM order_history WHERE order_id = ? ORDER BY changed_at DESC''',
+        [order_id]
     )

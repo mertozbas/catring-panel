@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} - Geçmiş{% endblock %}
+{% block page_title %}Müşteri Geçmişi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="{{ url_for('customers.index') }}" class="btn btn-outline">&larr; Müşterilere Dön</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>{{ customer.name }}</h3>
+        {% if customer.segment == 'vip' %}
+        <span class="badge" style="background:gold;color:#333;">VIP</span>
+        {% elif customer.segment == 'yeni' %}
+        <span class="badge" style="background:#3498db;color:#fff;">Yeni</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+            <div><small style="color:#999;">İletişim</small><br><strong>{{ customer.contact_name or '-' }}</strong></div>
+            <div><small style="color:#999;">Telefon</small><br><strong>{{ customer.phone or '-' }}</strong></div>
+            <div><small style="color:#999;">Adres</small><br><strong>{{ customer.address or '-' }}</strong></div>
+            <div><small style="color:#999;">Vars. Porsiyon</small><br><strong>{{ customer.default_portion_count or '-' }}</strong></div>
+            <div><small style="color:#999;">Vars. Kap</small><br><span class="badge badge-{{ customer.default_container_type }}">{{ customer.default_container_type | replace('_',' ') | title }}</span></div>
+            {% if customer.unit_price %}
+            <div><small style="color:#999;">Birim Fiyat</small><br><strong>{{ "%.2f"|format(customer.unit_price) }} TL</strong></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if stats %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_orders or 0 }}</div>
+        <div class="stat-label">Toplam Sipariş</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_portions or 0 }}</div>
+        <div class="stat-label">Toplam Porsiyon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.avg_portions or 0 }}</div>
+        <div class="stat-label">Ort. Porsiyon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="font-size:18px;">{{ stats.first_order or '-' }}</div>
+        <div class="stat-label">İlk Sipariş</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="font-size:18px;">{{ stats.last_order or '-' }}</div>
+        <div class="stat-label">Son Sipariş</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><h3>Son Siparişler (90 gün)</h3></div>
+    <div class="card-body">
+        {% if orders %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Porsiyon</th>
+                        <th>Çeşit</th>
+                        <th>Kap Tipi</th>
+                        <th>Rota</th>
+                        <th>Özel Not</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td><strong>{{ o.date }}</strong></td>
+                        <td>{{ o.portion_count }}{% if o.portion_detail %} <small>({{ o.portion_detail }})</small>{% endif %}</td>
+                        <td>{{ o.variety_count }}</td>
+                        <td><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_',' ') | title }}</span></td>
+                        <td>{{ o.route_name or '-' }}</td>
+                        <td>{% if o.special_notes %}<span class="note-highlight">{{ o.special_notes }}</span>{% endif %}</td>
+                        <td><span class="badge badge-{% if o.status == 'delivered' %}success{% elif o.status == 'pending' %}warning{% else %}info{% endif %}">{{ o.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Bu müşterinin henüz siparişi yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

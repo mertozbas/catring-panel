@@ -40,6 +40,7 @@
                         </td>
                         <td>
                             <form method="POST" action="{{ url_for('inventory.adjust', item_id=item.id) }}" style="display:inline-flex;gap:5px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <input type="number" step="any" name="quantity_change" class="form-control" style="width:80px;" placeholder="+/-">
                                 <button type="submit" class="btn btn-sm btn-outline">Güncelle</button>
                             </form>
@@ -63,6 +64,7 @@
             <button class="modal-close" onclick="closeModal('addItemModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('inventory.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">

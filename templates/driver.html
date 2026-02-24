@@ -118,9 +118,8 @@
                         {% endif %}
 
                         {% if o.status != 'delivered' and o.status != 'cancelled' %}
-                        <form method="POST" action="{{ url_for('driver_ui.deliver', order_id=o.id) }}" style="display:inline;">
-                            <button type="submit" class="btn btn-success btn-deliver">✅ Teslim Edildi</button>
-                        </form>
+                        <button type="button" class="btn btn-success btn-deliver" onclick="openDeliverModal({{ o.id }}, '{{ o.customer_name|e }}')">✅ Teslim Et</button>
+                        <button type="button" class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="openProblemModal({{ o.id }}, '{{ o.customer_name|e }}')">⚠️ Problem</button>
                         {% elif o.status == 'delivered' %}
                         <span class="badge badge-success" style="padding:8px 12px;">✓ Teslim Edildi</span>
                         {% else %}
@@ -134,6 +133,7 @@
             {% if r.status != 'completed' %}
             <div style="margin-top:15px;text-align:center;">
                 <form method="POST" action="{{ url_for('driver_ui.complete_route', route_id=r.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-success btn-deliver" onclick="return confirm('Rotayı tamamlamak istediğinize emin misiniz?')">🏁 Rotayı Tamamla</button>
                 </form>
             </div>
@@ -162,6 +162,86 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Teslimat Onay Modal -->
+<div class="modal-overlay" id="deliverModal">
+    <div class="modal" style="max-width:400px;">
+        <div class="modal-header">
+            <h3>Teslimat Onayi</h3>
+            <button class="modal-close" onclick="closeModal('deliverModal')">&times;</button>
+        </div>
+        <form method="POST" id="deliverForm" action="">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-body">
+                <p style="font-size:14px;margin-bottom:12px;"><strong id="deliverCustomerName"></strong></p>
+                <div class="form-group">
+                    <label>Teslimat Notu (Opsiyonel)</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                        <button type="button" class="btn btn-sm btn-outline" onclick="setDeliverNote('Kapida birakildi')">Kapida birakildi</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="setDeliverNote('Resepsiyona teslim')">Resepsiyona teslim</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="setDeliverNote('Elden teslim')">Elden teslim</button>
+                    </div>
+                    <textarea name="notes" id="deliverNotes" class="form-control" rows="2" placeholder="Not ekle..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('deliverModal')">Iptal</button>
+                <button type="submit" class="btn btn-success">✅ Teslim Edildi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Problem Bildir Modal -->
+<div class="modal-overlay" id="problemModal">
+    <div class="modal" style="max-width:400px;">
+        <div class="modal-header">
+            <h3 style="color:var(--danger);">Problem Bildir</h3>
+            <button class="modal-close" onclick="closeModal('problemModal')">&times;</button>
+        </div>
+        <form method="POST" id="problemForm" action="">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-body">
+                <p style="font-size:14px;margin-bottom:12px;"><strong id="problemCustomerName"></strong></p>
+                <div class="form-group">
+                    <label>Problem Tipi *</label>
+                    <select name="problem_type" class="form-control" required>
+                        <option value="">Secin...</option>
+                        <option value="musteri_yok">Musteri yok / Kapali</option>
+                        <option value="adres_bulunamadi">Adres bulunamadi</option>
+                        <option value="siparis_reddedildi">Siparis reddedildi</option>
+                        <option value="diger">Diger</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Aciklama</label>
+                    <textarea name="problem_notes" class="form-control" rows="2" placeholder="Detay ekle..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('problemModal')">Iptal</button>
+                <button type="submit" class="btn" style="background:var(--danger);color:#fff;">⚠️ Problem Bildir</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openDeliverModal(orderId, customerName) {
+    document.getElementById('deliverForm').action = '/driver/deliver/' + orderId;
+    document.getElementById('deliverCustomerName').textContent = customerName;
+    document.getElementById('deliverNotes').value = '';
+    openModal('deliverModal');
+}
+function setDeliverNote(text) {
+    document.getElementById('deliverNotes').value = text;
+}
+function openProblemModal(orderId, customerName) {
+    document.getElementById('problemForm').action = '/driver/problem/' + orderId;
+    document.getElementById('problemCustomerName').textContent = customerName;
+    openModal('problemModal');
+}
+</script>
 
 {% if google_maps_key and routes %}
 <script>

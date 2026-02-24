@@ -201,6 +201,100 @@ def migrate():
     else:
         print("- GOOGLE_MAPS_API_KEY ayarlanmamış, geocoding atlandı")
 
+    # 10.5 Müşteri segment ve unit_price kolonları
+    try:
+        c.execute("ALTER TABLE customers ADD COLUMN segment TEXT DEFAULT 'normal'")
+        print("✓ customers.segment eklendi")
+    except sqlite3.OperationalError:
+        print("- customers.segment zaten var")
+
+    try:
+        c.execute("ALTER TABLE customers ADD COLUMN unit_price REAL")
+        print("✓ customers.unit_price eklendi")
+    except sqlite3.OperationalError:
+        print("- customers.unit_price zaten var")
+
+    # 11. Siparis gecmisi tablosu
+    try:
+        c.execute("""CREATE TABLE IF NOT EXISTS order_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            field_name TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            changed_by TEXT,
+            changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )""")
+        print("✓ order_history tablosu oluşturuldu")
+    except sqlite3.OperationalError:
+        print("- order_history tablosu zaten var")
+
+    # 12. Payments tablosu (Cari Hesap)
+    c.execute("""CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        invoice_id INTEGER,
+        amount REAL NOT NULL,
+        date DATE NOT NULL,
+        payment_method TEXT DEFAULT 'nakit',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customer_id) REFERENCES customers(id),
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+    )""")
+    print("✓ payments tablosu kontrol edildi")
+
+    # 13. Notifications tablosu
+    c.execute("""CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT,
+        link TEXT,
+        is_read INTEGER DEFAULT 0,
+        target_role TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    print("✓ notifications tablosu kontrol edildi")
+
+    # 14. delivery_confirmations problem kolonları
+    try:
+        c.execute("ALTER TABLE delivery_confirmations ADD COLUMN problem_type TEXT")
+        print("✓ delivery_confirmations.problem_type eklendi")
+    except sqlite3.OperationalError:
+        print("- delivery_confirmations.problem_type zaten var")
+
+    try:
+        c.execute("ALTER TABLE delivery_confirmations ADD COLUMN problem_notes TEXT")
+        print("✓ delivery_confirmations.problem_notes eklendi")
+    except sqlite3.OperationalError:
+        print("- delivery_confirmations.problem_notes zaten var")
+
+    # 15. Performans indexleri oluştur
+    print("\n  Performans indexleri oluşturuluyor...")
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date)",
+        "CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)",
+        "CREATE INDEX IF NOT EXISTS idx_orders_route ON orders(route_id)",
+        "CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)",
+        "CREATE INDEX IF NOT EXISTS idx_routes_date ON routes(date)",
+        "CREATE INDEX IF NOT EXISTS idx_routes_driver ON routes(driver_id)",
+        "CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name)",
+        "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+        "CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases(status)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)",
+        "CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id)",
+        "CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status)",
+        "CREATE INDEX IF NOT EXISTS idx_order_history_order ON order_history(order_id)",
+        "CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id)",
+        "CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id)",
+    ]
+    for idx_sql in indexes:
+        c.execute(idx_sql)
+    conn.commit()
+    print(f"✓ {len(indexes)} index oluşturuldu/kontrol edildi")
+
     conn.close()
 
     print("")

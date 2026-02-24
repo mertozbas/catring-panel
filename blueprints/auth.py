@@ -11,8 +11,8 @@ ROLE_PERMISSIONS = {
     'mutfak': ['dashboard', 'kitchen', 'menu', 'inventory'],
     'diyetisyen': ['dashboard', 'dietitian', 'menu', 'inventory'],
     'sofor': ['driver_ui'],
-    'planlama': ['dashboard', 'planning', 'purchasing', 'inventory'],
-    'muhasebe': ['dashboard', 'erp'],
+    'planlama': ['dashboard', 'planning', 'purchasing', 'inventory', 'reports'],
+    'muhasebe': ['dashboard', 'erp', 'reports'],
 }
 
 ROLE_LABELS = {

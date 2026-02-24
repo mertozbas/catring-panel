@@ -10,6 +10,7 @@
     <div class="toolbar-right">
         {% if purchase.status == 'pending' %}
         <form method="POST" action="{{ url_for('purchasing.receive', purchase_id=purchase.id) }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="btn btn-primary" onclick="return confirm('Bu satınalma teslim alındı olarak işaretlensin mi?')">📦 Teslim Al</button>
         </form>
         {% endif %}
@@ -79,6 +80,7 @@
             <button class="modal-close" onclick="closeModal('addItemModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('purchasing.add_item', purchase_id=purchase.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">

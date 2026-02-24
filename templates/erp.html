@@ -4,37 +4,99 @@
 
 {% block content %}
 <div class="tab-nav">
-    <a href="?tab=overview" class="{% if tab == 'overview' %}active{% endif %}">Genel Bakış</a>
+    <a href="?tab=overview" class="{% if tab == 'overview' %}active{% endif %}">Genel Bakis</a>
     <a href="?tab=invoices" class="{% if tab == 'invoices' %}active{% endif %}">Faturalar</a>
+    <a href="?tab=cari" class="{% if tab == 'cari' %}active{% endif %}">Cari Hesap</a>
     <a href="?tab=transactions" class="{% if tab == 'transactions' %}active{% endif %}">Gelir/Gider</a>
-    <a href="?tab=settings" class="{% if tab == 'settings' %}active{% endif %}">ERP Ayarları</a>
+    <a href="?tab=comparison" class="{% if tab == 'comparison' %}active{% endif %}">Donem Analizi</a>
+    <a href="?tab=settings" class="{% if tab == 'settings' %}active{% endif %}">ERP Ayarlari</a>
 </div>
 
+{# ============ GENEL BAKIS TAB ============ #}
 {% if tab == 'overview' %}
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-value" style="color:var(--success);">{{ "%.2f"|format(summary.total_income or 0) }} TL</div>
+        <div class="stat-value" style="color:var(--success);">{{ "%.0f"|format(summary.total_income or 0) }} TL</div>
         <div class="stat-label">Bu Ay Gelir</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value" style="color:var(--danger);">{{ "%.2f"|format(summary.total_expense or 0) }} TL</div>
+        <div class="stat-value" style="color:var(--danger);">{{ "%.0f"|format(summary.total_expense or 0) }} TL</div>
         <div class="stat-label">Bu Ay Gider</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value">{{ "%.2f"|format((summary.total_income or 0) - (summary.total_expense or 0)) }} TL</div>
-        <div class="stat-label">Net Kar</div>
+        {% set net = (summary.total_income or 0) - (summary.total_expense or 0) %}
+        <div class="stat-value" style="color:{% if net >= 0 %}var(--success){% else %}var(--danger){% endif %};">{{ "%.0f"|format(net) }} TL</div>
+        <div class="stat-label">Net Kar/Zarar</div>
+    </div>
+    <div class="stat-card">
+        {% set total_receivable = 0 %}
+        {% for cb in customer_balances %}{% set total_receivable = total_receivable + cb.balance %}{% endfor %}
+        <div class="stat-value" style="color:var(--warning);">{{ "%.0f"|format(total_receivable) }} TL</div>
+        <div class="stat-label">Toplam Alacak</div>
     </div>
 </div>
 
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <!-- Aylik Trend Grafik -->
+    <div class="card">
+        <div class="card-header"><h3>Aylik Gelir/Gider Trendi</h3></div>
+        <div class="card-body">
+            <canvas id="monthlyTrendChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <!-- Gider Kirilimi -->
+    <div class="card">
+        <div class="card-header"><h3>Bu Ay Gider Kirilimi</h3></div>
+        <div class="card-body">
+            {% if expense_breakdown %}
+            <canvas id="expenseChart" height="220"></canvas>
+            {% else %}
+            <div class="empty-state"><p>Bu ay gider kaydi yok.</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Odenmemis Faturalar -->
+{% if unpaid_invoices %}
+<div class="card" style="border-left:4px solid var(--warning);">
+    <div class="card-header">
+        <h3 style="color:var(--warning);">Odenmemis Faturalar ({{ unpaid_invoices|length }})</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Fatura No</th><th>Musteri</th><th>Tarih</th><th>Tutar</th><th>KDV</th><th>Toplam</th><th>Durum</th></tr></thead>
+                <tbody>
+                    {% for inv in unpaid_invoices[:10] %}
+                    <tr>
+                        <td>{{ inv.invoice_number }}</td>
+                        <td><strong>{{ inv.customer_name or '-' }}</strong></td>
+                        <td>{{ inv.date }}</td>
+                        <td>{{ "%.2f"|format(inv.total_amount) }} TL</td>
+                        <td>{{ "%.2f"|format(inv.tax_amount) }} TL</td>
+                        <td><strong>{{ "%.2f"|format(inv.total_amount + inv.tax_amount) }} TL</strong></td>
+                        <td><span class="badge badge-{% if inv.status == 'sent' %}info{% else %}warning{% endif %}">{{ inv.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Son Islemler -->
 <div class="card">
-    <div class="card-header"><h3>Son İşlemler</h3></div>
+    <div class="card-header"><h3>Son Islemler</h3></div>
     <div class="card-body">
         {% if recent_transactions %}
         <div class="table-container">
             <table>
-                <thead><tr><th>Tarih</th><th>Tip</th><th>Kategori</th><th>Açıklama</th><th>Tutar</th></tr></thead>
+                <thead><tr><th>Tarih</th><th>Tip</th><th>Kategori</th><th>Aciklama</th><th>Tutar</th></tr></thead>
                 <tbody>
-                    {% for t in recent_transactions %}
+                    {% for t in recent_transactions[:10] %}
                     <tr>
                         <td>{{ t.date }}</td>
                         <td><span class="badge badge-{% if t.type == 'income' %}success{% else %}danger{% endif %}">{{ 'Gelir' if t.type == 'income' else 'Gider' }}</span></td>
@@ -47,15 +109,17 @@
             </table>
         </div>
         {% else %}
-        <div class="empty-state"><p>Henüz işlem yok.</p></div>
+        <div class="empty-state"><p>Henuz islem yok.</p></div>
         {% endif %}
     </div>
 </div>
 
+{# ============ FATURALAR TAB ============ #}
 {% elif tab == 'invoices' %}
 <div class="toolbar">
     <div class="toolbar-left"></div>
     <div class="toolbar-right">
+        <button class="btn btn-secondary" onclick="openModal('autoInvoiceModal')">Otomatik Fatura</button>
         <button class="btn btn-primary" onclick="openModal('addInvoiceModal')">+ Yeni Fatura</button>
     </div>
 </div>
@@ -66,22 +130,25 @@
         <div class="table-container">
             <table>
                 <thead>
-                    <tr><th>Fatura No</th><th>Müşteri</th><th>Tarih</th><th>Porsiyon</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr>
+                    <tr><th>Fatura No</th><th>Musteri</th><th>Donem</th><th>Porsiyon</th><th>Tutar</th><th>KDV</th><th>Toplam</th><th>Durum</th><th>Islem</th></tr>
                 </thead>
                 <tbody>
                     {% for inv in invoices %}
                     <tr>
                         <td>{{ inv.invoice_number }}</td>
                         <td><strong>{{ inv.customer_name or '-' }}</strong></td>
-                        <td>{{ inv.date }}</td>
+                        <td>{% if inv.period_start %}{{ inv.period_start }} - {{ inv.period_end }}{% else %}-{% endif %}</td>
                         <td>{{ inv.total_portions }}</td>
-                        <td><strong>{{ "%.2f"|format(inv.total_amount) }} TL</strong></td>
+                        <td>{{ "%.2f"|format(inv.total_amount) }} TL</td>
+                        <td>{{ "%.2f"|format(inv.tax_amount) }} TL</td>
+                        <td><strong>{{ "%.2f"|format(inv.total_amount + inv.tax_amount) }} TL</strong></td>
                         <td><span class="badge badge-{% if inv.status == 'paid' %}success{% elif inv.status == 'sent' %}info{% else %}warning{% endif %}">{{ inv.status }}</span></td>
-                        <td>
+                        <td style="white-space:nowrap;">
+                            <a href="{{ url_for('erp.invoice_pdf', invoice_id=inv.id) }}" class="btn btn-sm btn-outline" title="PDF">PDF</a>
                             {% if inv.status == 'draft' %}
-                            <a href="{{ url_for('erp.update_invoice_status', invoice_id=inv.id, status='sent') }}" class="btn btn-sm btn-info">Gönder</a>
+                            <a href="{{ url_for('erp.update_invoice_status', invoice_id=inv.id, status='sent') }}" class="btn btn-sm btn-info">Gonder</a>
                             {% elif inv.status == 'sent' %}
-                            <a href="{{ url_for('erp.update_invoice_status', invoice_id=inv.id, status='paid') }}" class="btn btn-sm btn-success">Ödendi</a>
+                            <a href="{{ url_for('erp.update_invoice_status', invoice_id=inv.id, status='paid') }}" class="btn btn-sm btn-success">Odendi</a>
                             {% endif %}
                         </td>
                     </tr>
@@ -95,6 +162,7 @@
     </div>
 </div>
 
+<!-- Manuel Fatura Modal -->
 <div class="modal-overlay" id="addInvoiceModal">
     <div class="modal">
         <div class="modal-header">
@@ -102,12 +170,13 @@
             <button class="modal-close" onclick="closeModal('addInvoiceModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('erp.add_invoice') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Müşteri</label>
+                        <label>Musteri</label>
                         <select name="customer_id" class="form-control">
-                            <option value="">Seçin...</option>
+                            <option value="">Secin...</option>
                             {% for c in customers %}
                             <option value="{{ c.id }}">{{ c.name }}</option>
                             {% endfor %}
@@ -120,11 +189,11 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Dönem Başlangıç</label>
+                        <label>Donem Baslangic</label>
                         <input type="date" name="period_start" class="form-control">
                     </div>
                     <div class="form-group">
-                        <label>Dönem Bitiş</label>
+                        <label>Donem Bitis</label>
                         <input type="date" name="period_end" class="form-control">
                     </div>
                 </div>
@@ -154,18 +223,225 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeModal('addInvoiceModal')">İptal</button>
-                <button type="submit" class="btn btn-primary">Oluştur</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addInvoiceModal')">Iptal</button>
+                <button type="submit" class="btn btn-primary">Olustur</button>
             </div>
         </form>
     </div>
 </div>
 
+<!-- Otomatik Fatura Modal -->
+<div class="modal-overlay" id="autoInvoiceModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Otomatik Fatura Olustur</h3>
+            <button class="modal-close" onclick="closeModal('autoInvoiceModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('erp.auto_generate_invoice') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-body">
+                <p style="font-size:13px;color:#666;margin-bottom:12px;">Musteri ve donem secin. Sistem otomatik olarak porsiyon sayisini hesaplayip fatura olusturacak.</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Musteri *</label>
+                        <select name="customer_id" id="autoInvCustomer" class="form-control" required onchange="calcPortions()">
+                            <option value="">Secin...</option>
+                            {% for c in customers %}
+                            <option value="{{ c.id }}" data-unit-price="{{ c.unit_price or 0 }}">{{ c.name }}{% if c.unit_price %} ({{ "%.2f"|format(c.unit_price) }} TL){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Donem Baslangic *</label>
+                        <input type="date" name="period_start" id="autoInvStart" class="form-control" required onchange="calcPortions()">
+                    </div>
+                    <div class="form-group">
+                        <label>Donem Bitis *</label>
+                        <input type="date" name="period_end" id="autoInvEnd" class="form-control" required onchange="calcPortions()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Birim Fiyat (TL)</label>
+                        <input type="number" step="any" name="unit_price" id="autoInvPrice" class="form-control" placeholder="Musteri varsayilan fiyati kullanilir">
+                    </div>
+                    <div class="form-group">
+                        <label>KDV Orani (%)</label>
+                        <input type="number" name="tax_rate" class="form-control" value="10">
+                    </div>
+                </div>
+                <div id="autoInvPreview" style="display:none;padding:12px;background:var(--bg);border-radius:var(--radius);margin-top:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:14px;">
+                        <span>Siparis Sayisi: <strong id="previewOrders">-</strong></span>
+                        <span>Toplam Porsiyon: <strong id="previewPortions">-</strong></span>
+                        <span>Birim Fiyat: <strong id="previewPrice">-</strong> TL</span>
+                    </div>
+                    <div style="margin-top:8px;font-size:16px;font-weight:700;text-align:right;color:var(--primary);">
+                        Tahmini Tutar: <span id="previewTotal">-</span> TL
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('autoInvoiceModal')">Iptal</button>
+                <button type="submit" class="btn btn-primary">Fatura Olustur</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ============ CARİ HESAP TAB ============ #}
+{% elif tab == 'cari' %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <h3 style="margin:0;">Musteri Cari Hesaplari</h3>
+    </div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addPaymentModal')">+ Odeme Kaydi</button>
+    </div>
+</div>
+
+<!-- Cari Bakiye Tablosu -->
+<div class="card">
+    <div class="card-header"><h3>Musteri Bakiyeleri</h3></div>
+    <div class="card-body">
+        {% if customer_balances %}
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Musteri</th><th>Segment</th><th>Toplam Borc</th><th>Toplam Odeme</th><th>Bakiye</th><th>Durum</th></tr></thead>
+                <tbody>
+                    {% for cb in customer_balances %}
+                    <tr>
+                        <td><strong>{{ cb.name }}</strong></td>
+                        <td><span class="badge" style="{% if cb.segment == 'vip' %}background:gold;color:#333;{% elif cb.segment == 'yeni' %}background:#3498db;color:#fff;{% else %}background:#eee;color:#666;{% endif %}">{{ cb.segment|upper }}</span></td>
+                        <td>{{ "%.2f"|format(cb.total_debt) }} TL</td>
+                        <td>{{ "%.2f"|format(cb.total_paid) }} TL</td>
+                        <td><strong style="color:{% if cb.balance > 0 %}var(--danger){% elif cb.balance < 0 %}var(--success){% else %}var(--text){% endif %};">{{ "%.2f"|format(cb.balance) }} TL</strong></td>
+                        <td>
+                            {% if cb.balance > 0 %}
+                            <span class="badge badge-danger">Borclu</span>
+                            {% elif cb.balance < 0 %}
+                            <span class="badge badge-success">Alacakli</span>
+                            {% else %}
+                            <span class="badge badge-info">Temiz</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Cari hesap hareketi yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Son Odemeler -->
+<div class="card">
+    <div class="card-header"><h3>Son Odemeler</h3></div>
+    <div class="card-body">
+        {% if recent_payments %}
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Tarih</th><th>Musteri</th><th>Tutar</th><th>Yontem</th><th>Fatura</th><th>Not</th></tr></thead>
+                <tbody>
+                    {% for p in recent_payments %}
+                    <tr>
+                        <td>{{ p.date }}</td>
+                        <td><strong>{{ p.customer_name }}</strong></td>
+                        <td><strong style="color:var(--success);">{{ "%.2f"|format(p.amount) }} TL</strong></td>
+                        <td>
+                            {% if p.payment_method == 'nakit' %}Nakit
+                            {% elif p.payment_method == 'havale' %}Havale/EFT
+                            {% elif p.payment_method == 'kredi_karti' %}Kredi Karti
+                            {% elif p.payment_method == 'cek' %}Cek
+                            {% else %}{{ p.payment_method }}{% endif %}
+                        </td>
+                        <td>{{ p.invoice_number or '-' }}</td>
+                        <td>{{ p.notes or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Odeme kaydi yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Odeme Ekle Modal -->
+<div class="modal-overlay" id="addPaymentModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Odeme Kaydi Ekle</h3>
+            <button class="modal-close" onclick="closeModal('addPaymentModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('erp.add_payment') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Musteri *</label>
+                        <select name="customer_id" class="form-control" required>
+                            <option value="">Secin...</option>
+                            {% for c in customers %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tutar (TL) *</label>
+                        <input type="number" step="any" name="amount" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tarih *</label>
+                        <input type="date" name="date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Odeme Yontemi</label>
+                        <select name="payment_method" class="form-control">
+                            <option value="nakit">Nakit</option>
+                            <option value="havale">Havale/EFT</option>
+                            <option value="kredi_karti">Kredi Karti</option>
+                            <option value="cek">Cek</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Fatura (Opsiyonel)</label>
+                    <select name="invoice_id" class="form-control">
+                        <option value="">Faturasiz Odeme</option>
+                        {% for inv in invoices %}
+                        {% if inv.status != 'paid' %}
+                        <option value="{{ inv.id }}">{{ inv.invoice_number }} - {{ inv.customer_name or '?' }} ({{ "%.2f"|format(inv.total_amount + inv.tax_amount) }} TL)</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Not</label>
+                    <textarea name="notes" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addPaymentModal')">Iptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ============ GELiR/GiDER TAB ============ #}
 {% elif tab == 'transactions' %}
 <div class="toolbar">
     <div class="toolbar-left"></div>
     <div class="toolbar-right">
-        <button class="btn btn-primary" onclick="openModal('addTransactionModal')">+ Yeni İşlem</button>
+        <button class="btn btn-primary" onclick="openModal('addTransactionModal')">+ Yeni Islem</button>
     </div>
 </div>
 
@@ -174,7 +450,7 @@
         {% if recent_transactions %}
         <div class="table-container">
             <table>
-                <thead><tr><th>Tarih</th><th>Tip</th><th>Kategori</th><th>Açıklama</th><th>Tutar</th></tr></thead>
+                <thead><tr><th>Tarih</th><th>Tip</th><th>Kategori</th><th>Aciklama</th><th>Tutar</th></tr></thead>
                 <tbody>
                     {% for t in recent_transactions %}
                     <tr>
@@ -189,7 +465,7 @@
             </table>
         </div>
         {% else %}
-        <div class="empty-state"><p>İşlem yok.</p></div>
+        <div class="empty-state"><p>Islem yok.</p></div>
         {% endif %}
     </div>
 </div>
@@ -197,10 +473,11 @@
 <div class="modal-overlay" id="addTransactionModal">
     <div class="modal">
         <div class="modal-header">
-            <h3>Yeni İşlem</h3>
+            <h3>Yeni Islem</h3>
             <button class="modal-close" onclick="closeModal('addTransactionModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('erp.add_transaction') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -213,13 +490,24 @@
                     <div class="form-group">
                         <label>Kategori</label>
                         <select name="category" class="form-control">
-                            <option value="food_sale">Yemek Satışı</option>
-                            <option value="ingredient_purchase">Malzeme Alımı</option>
-                            <option value="salary">Maaş</option>
-                            <option value="rent">Kira</option>
-                            <option value="utility">Fatura (Elektrik/Su/Doğalgaz)</option>
-                            <option value="transport">Ulaşım</option>
-                            <option value="other">Diğer</option>
+                            <optgroup label="Gelir">
+                                <option value="food_sale">Yemek Satisi</option>
+                                <option value="catering">Ozel Catering</option>
+                            </optgroup>
+                            <optgroup label="Gider">
+                                <option value="ingredient_purchase">Malzeme Alimi</option>
+                                <option value="salary">Maas</option>
+                                <option value="rent">Kira</option>
+                                <option value="utility">Fatura (Elektrik/Su/Dogalgaz)</option>
+                                <option value="transport">Ulasim</option>
+                                <option value="fuel">Yakit</option>
+                                <option value="equipment">Ekipman</option>
+                                <option value="maintenance">Bakim/Onarim</option>
+                                <option value="marketing">Pazarlama/Reklam</option>
+                                <option value="insurance">Sigorta</option>
+                                <option value="tax">Vergi/Haralar</option>
+                                <option value="other">Diger</option>
+                            </optgroup>
                         </select>
                     </div>
                 </div>
@@ -234,23 +522,114 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Açıklama</label>
+                    <label>Aciklama</label>
                     <textarea name="description" class="form-control"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeModal('addTransactionModal')">İptal</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('addTransactionModal')">Iptal</button>
                 <button type="submit" class="btn btn-primary">Kaydet</button>
             </div>
         </form>
     </div>
 </div>
 
+{# ============ DONEM ANALiZi TAB ============ #}
+{% elif tab == 'comparison' %}
+<div class="card">
+    <div class="card-header"><h3>Bu Ay vs Gecen Ay Karsilastirmasi</h3></div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div>
+                <h4 style="text-align:center;color:var(--primary);margin-bottom:12px;">Bu Ay</h4>
+                <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
+                    <div class="stat-card">
+                        <div class="stat-value" style="color:var(--success);font-size:18px;">{{ "%.0f"|format(comparison.current.income) }} TL</div>
+                        <div class="stat-label">Gelir</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color:var(--danger);font-size:18px;">{{ "%.0f"|format(comparison.current.expense) }} TL</div>
+                        <div class="stat-label">Gider</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="font-size:18px;">{{ comparison.current.orders }}</div>
+                        <div class="stat-label">Siparis</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="font-size:18px;">{{ comparison.current.portions }}</div>
+                        <div class="stat-label">Porsiyon</div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h4 style="text-align:center;color:#999;margin-bottom:12px;">Gecen Ay</h4>
+                <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
+                    <div class="stat-card" style="opacity:0.7;">
+                        <div class="stat-value" style="color:var(--success);font-size:18px;">{{ "%.0f"|format(comparison.previous.income) }} TL</div>
+                        <div class="stat-label">Gelir</div>
+                    </div>
+                    <div class="stat-card" style="opacity:0.7;">
+                        <div class="stat-value" style="color:var(--danger);font-size:18px;">{{ "%.0f"|format(comparison.previous.expense) }} TL</div>
+                        <div class="stat-label">Gider</div>
+                    </div>
+                    <div class="stat-card" style="opacity:0.7;">
+                        <div class="stat-value" style="font-size:18px;">{{ comparison.previous.orders }}</div>
+                        <div class="stat-label">Siparis</div>
+                    </div>
+                    <div class="stat-card" style="opacity:0.7;">
+                        <div class="stat-value" style="font-size:18px;">{{ comparison.previous.portions }}</div>
+                        <div class="stat-label">Porsiyon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Degisim Yuzdeleri -->
+        <div style="margin-top:20px;padding:15px;background:var(--bg);border-radius:var(--radius);">
+            <h4 style="margin-bottom:10px;">Degisim</h4>
+            <div style="display:flex;gap:30px;flex-wrap:wrap;">
+                {% set income_change = ((comparison.current.income - comparison.previous.income) / comparison.previous.income * 100) if comparison.previous.income > 0 else 0 %}
+                {% set expense_change = ((comparison.current.expense - comparison.previous.expense) / comparison.previous.expense * 100) if comparison.previous.expense > 0 else 0 %}
+                {% set portion_change = ((comparison.current.portions - comparison.previous.portions) / comparison.previous.portions * 100) if comparison.previous.portions > 0 else 0 %}
+
+                <div>
+                    <span style="font-size:13px;color:#666;">Gelir:</span>
+                    <strong style="color:{% if income_change >= 0 %}var(--success){% else %}var(--danger){% endif %};font-size:16px;">
+                        {% if income_change >= 0 %}+{% endif %}{{ "%.1f"|format(income_change) }}%
+                    </strong>
+                </div>
+                <div>
+                    <span style="font-size:13px;color:#666;">Gider:</span>
+                    <strong style="color:{% if expense_change <= 0 %}var(--success){% else %}var(--danger){% endif %};font-size:16px;">
+                        {% if expense_change >= 0 %}+{% endif %}{{ "%.1f"|format(expense_change) }}%
+                    </strong>
+                </div>
+                <div>
+                    <span style="font-size:13px;color:#666;">Porsiyon:</span>
+                    <strong style="color:{% if portion_change >= 0 %}var(--success){% else %}var(--danger){% endif %};font-size:16px;">
+                        {% if portion_change >= 0 %}+{% endif %}{{ "%.1f"|format(portion_change) }}%
+                    </strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Aylik Trend Grafik -->
+<div class="card">
+    <div class="card-header"><h3>6 Aylik Gelir/Gider Trendi</h3></div>
+    <div class="card-body">
+        <canvas id="comparisonChart" height="250"></canvas>
+    </div>
+</div>
+
+{# ============ AYARLAR TAB ============ #}
 {% elif tab == 'settings' %}
 <div class="card">
-    <div class="card-header"><h3>ERP Ayarları</h3></div>
+    <div class="card-header"><h3>ERP Ayarlari</h3></div>
     <div class="card-body">
         <form method="POST" action="{{ url_for('erp.update_settings') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group">
                 <label>ERP Modu</label>
                 <select name="erp_mode" class="form-control" id="erpMode" onchange="toggleErpFields()">
@@ -284,4 +663,130 @@ function toggleErpFields() {
 }
 </script>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Otomatik fatura porsiyon hesaplama
+function calcPortions() {
+    var cid = document.getElementById('autoInvCustomer');
+    var start = document.getElementById('autoInvStart');
+    var end = document.getElementById('autoInvEnd');
+    if (!cid || !start || !end) return;
+    if (!cid.value || !start.value || !end.value) return;
+
+    var selected = cid.options[cid.selectedIndex];
+    var defaultPrice = parseFloat(selected.getAttribute('data-unit-price')) || 0;
+    var priceField = document.getElementById('autoInvPrice');
+    if (priceField && !priceField.value && defaultPrice > 0) {
+        priceField.value = defaultPrice;
+    }
+
+    var formData = new FormData();
+    formData.append('customer_id', cid.value);
+    formData.append('period_start', start.value);
+    formData.append('period_end', end.value);
+    formData.append('csrf_token', '{{ csrf_token() }}');
+
+    fetch('{{ url_for("erp.calculate_portions") }}', {method:'POST', body: formData})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var preview = document.getElementById('autoInvPreview');
+        if (preview) {
+            preview.style.display = 'block';
+            document.getElementById('previewOrders').textContent = data.order_count;
+            document.getElementById('previewPortions').textContent = data.total_portions;
+            var price = parseFloat(priceField.value) || data.unit_price || 0;
+            document.getElementById('previewPrice').textContent = price.toFixed(2);
+            var total = data.total_portions * price;
+            document.getElementById('previewTotal').textContent = total.toFixed(2);
+        }
+    });
+}
+
+// Category labels
+var categoryLabels = {
+    'food_sale': 'Yemek Satisi',
+    'catering': 'Ozel Catering',
+    'ingredient_purchase': 'Malzeme Alimi',
+    'salary': 'Maas',
+    'rent': 'Kira',
+    'utility': 'Faturalar',
+    'transport': 'Ulasim',
+    'fuel': 'Yakit',
+    'equipment': 'Ekipman',
+    'maintenance': 'Bakim/Onarim',
+    'marketing': 'Pazarlama',
+    'insurance': 'Sigorta',
+    'tax': 'Vergi',
+    'other': 'Diger'
+};
+
+{% if tab == 'overview' %}
+// Aylik Trend Chart
+var monthlyData = {{ monthly_trend | tojson }};
+if (monthlyData.length > 0 && document.getElementById('monthlyTrendChart')) {
+    var mLabels = monthlyData.map(function(d) { return d.month; });
+    var mIncome = monthlyData.map(function(d) { return d.income || 0; });
+    var mExpense = monthlyData.map(function(d) { return d.expense || 0; });
+
+    new Chart(document.getElementById('monthlyTrendChart'), {
+        type: 'bar',
+        data: {
+            labels: mLabels,
+            datasets: [
+                { label: 'Gelir', data: mIncome, backgroundColor: 'rgba(46, 204, 113, 0.7)', borderColor: '#2ecc71', borderWidth: 1, borderRadius: 4 },
+                { label: 'Gider', data: mExpense, backgroundColor: 'rgba(231, 76, 60, 0.7)', borderColor: '#e74c3c', borderWidth: 1, borderRadius: 4 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+        }
+    });
+}
+
+// Gider kirilim chart
+{% if expense_breakdown %}
+var expLabels = {{ expense_breakdown | map(attribute='category') | list | tojson }};
+var expData = {{ expense_breakdown | map(attribute='total') | list | tojson }};
+var expColors = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#1abc9c', '#34495e', '#95a5a6', '#d35400', '#c0392b', '#7f8c8d'];
+expLabels = expLabels.map(function(l) { return categoryLabels[l] || l; });
+
+if (document.getElementById('expenseChart')) {
+    new Chart(document.getElementById('expenseChart'), {
+        type: 'doughnut',
+        data: {
+            labels: expLabels,
+            datasets: [{ data: expData, backgroundColor: expColors.slice(0, expLabels.length), borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 10, font: { size: 11 } } } } }
+    });
+}
+{% endif %}
+{% endif %}
+
+{% if tab == 'comparison' %}
+// Comparison trend chart
+var trendData = {{ monthly_trend | tojson }};
+if (trendData.length > 0 && document.getElementById('comparisonChart')) {
+    new Chart(document.getElementById('comparisonChart'), {
+        type: 'line',
+        data: {
+            labels: trendData.map(function(d) { return d.month; }),
+            datasets: [
+                { label: 'Gelir', data: trendData.map(function(d) { return d.income || 0; }), borderColor: '#2ecc71', backgroundColor: 'rgba(46,204,113,0.1)', fill: true, tension: 0.3 },
+                { label: 'Gider', data: trendData.map(function(d) { return d.expense || 0; }), borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true, tension: 0.3 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+}
+{% endif %}
+</script>
 {% endblock %}

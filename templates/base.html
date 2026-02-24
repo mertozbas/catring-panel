@@ -98,6 +98,12 @@
                     <span class="icon">&#8378;</span> Muhasebe / ERP
                 </a></li>
                 {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'reports' in allowed_blueprints %}
+                <li><a href="{{ url_for('reports.index') }}" class="{% if request.blueprint == 'reports' %}active{% endif %}">
+                    <span class="icon">&#9776;</span> Raporlar
+                </a></li>
+                {% endif %}
             </ul>
         </nav>
         <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
@@ -109,7 +115,21 @@
                 <div class="top-bar-right">
                     <span id="current-date"></span>
                     {% if is_logged_in %}
-                    <span style="margin-left:15px;font-size:13px;color:#666;">
+                    <!-- Bildirim Zili -->
+                    <div class="notif-wrapper" style="position:relative;display:inline-block;margin-left:15px;cursor:pointer;" onclick="toggleNotifDropdown()">
+                        <span style="font-size:20px;">&#128276;</span>
+                        <span id="notifBadge" style="display:none;position:absolute;top:-5px;right:-8px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;text-align:center;line-height:18px;">0</span>
+                        <div id="notifDropdown" style="display:none;position:absolute;right:0;top:35px;width:340px;max-height:400px;background:#fff;border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:9999;overflow:hidden;">
+                            <div style="padding:12px 15px;border-bottom:1px solid var(--bg-dark);display:flex;justify-content:space-between;align-items:center;">
+                                <strong style="font-size:14px;">Bildirimler</strong>
+                                <a href="#" onclick="markAllRead();return false;" style="font-size:12px;color:var(--primary);">Tumunu Okundu Isaretle</a>
+                            </div>
+                            <div id="notifList" style="max-height:330px;overflow-y:auto;">
+                                <div style="padding:20px;text-align:center;color:#999;font-size:13px;">Yukleniyor...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <span style="margin-left:10px;font-size:13px;color:#666;">
                         {{ current_user.name }}
                         <span class="badge" style="font-size:11px;padding:3px 8px;">{{ current_user.role_label }}</span>
                     </span>
@@ -133,6 +153,97 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% if is_logged_in %}
+    <script>
+    var notifOpen = false;
+    function toggleNotifDropdown() {
+        var dd = document.getElementById('notifDropdown');
+        notifOpen = !notifOpen;
+        dd.style.display = notifOpen ? 'block' : 'none';
+        if (notifOpen) loadNotifications();
+    }
+    // Dısarı tıklayınca kapat
+    document.addEventListener('click', function(e) {
+        var wrapper = document.querySelector('.notif-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            notifOpen = false;
+            document.getElementById('notifDropdown').style.display = 'none';
+        }
+    });
+
+    function loadNotifications() {
+        fetch('/api/notifications')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var badge = document.getElementById('notifBadge');
+            if (data.unread_count > 0) {
+                badge.style.display = 'block';
+                badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+            } else {
+                badge.style.display = 'none';
+            }
+            var list = document.getElementById('notifList');
+            if (data.notifications.length === 0) {
+                list.innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px;">Bildirim yok</div>';
+                return;
+            }
+            var html = '';
+            data.notifications.forEach(function(n) {
+                var bg = n.is_read ? '#fff' : '#fff8f0';
+                html += '<a href="' + (n.link || '#') + '" onclick="markRead(' + n.id + ')" style="display:block;padding:10px 15px;border-bottom:1px solid #f0f0f0;text-decoration:none;color:inherit;background:' + bg + ';">';
+                html += '<div style="display:flex;gap:8px;align-items:flex-start;">';
+                html += '<span style="font-size:16px;">' + n.icon + '</span>';
+                html += '<div style="flex:1;min-width:0;">';
+                html += '<div style="font-size:13px;font-weight:' + (n.is_read ? '400' : '600') + ';">' + n.title + '</div>';
+                if (n.message) html += '<div style="font-size:11px;color:#888;margin-top:2px;">' + n.message + '</div>';
+                html += '<div style="font-size:10px;color:#aaa;margin-top:3px;">' + timeAgo(n.created_at) + '</div>';
+                html += '</div></div></a>';
+            });
+            list.innerHTML = html;
+        });
+    }
+
+    function markRead(id) {
+        fetch('/api/notifications/' + id + '/read', {method:'POST', headers:{'X-CSRFToken': getCSRFToken()}});
+    }
+    function markAllRead() {
+        fetch('/api/notifications/read-all', {method:'POST', headers:{'X-CSRFToken': getCSRFToken()}})
+        .then(function() { loadNotifications(); });
+    }
+    function getCSRFToken() {
+        var meta = document.querySelector('input[name=csrf_token]');
+        return meta ? meta.value : '';
+    }
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        var now = new Date();
+        var d = new Date(dateStr);
+        var diff = Math.floor((now - d) / 1000);
+        if (diff < 60) return 'Az once';
+        if (diff < 3600) return Math.floor(diff/60) + ' dk once';
+        if (diff < 86400) return Math.floor(diff/3600) + ' saat once';
+        return Math.floor(diff/86400) + ' gun once';
+    }
+
+    // Periyodik kontrol (30 saniye)
+    function checkNotifications() {
+        fetch('/api/notifications')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var badge = document.getElementById('notifBadge');
+            if (data.unread_count > 0) {
+                badge.style.display = 'block';
+                badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+            } else {
+                badge.style.display = 'none';
+            }
+        });
+    }
+    // Sayfa yüklendiğinde ve her 30 saniyede kontrol et
+    checkNotifications();
+    setInterval(checkNotifications, 30000);
+    </script>
+    {% endif %}
     {% block scripts %}{% endblock %}
 </body>
 </html>

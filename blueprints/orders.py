@@ -102,6 +102,53 @@ def generate_daily():
     return redirect(url_for('orders.index', date=selected_date))
 
 
+@bp.route('/bulk-action', methods=['POST'])
+def bulk_action():
+    action = request.form.get('action')
+    order_ids = request.form.get('order_ids', '').split(',')
+    order_ids = [int(x) for x in order_ids if x.strip().isdigit()]
+    selected_date = request.form.get('date', date.today().isoformat())
+
+    if not order_ids:
+        flash('Sipariş seçilmedi.', 'warning')
+        return redirect(url_for('orders.index', date=selected_date))
+
+    affected_routes = set()
+    if action == 'change_status':
+        new_status = request.form.get('new_status', 'pending')
+        for oid in order_ids:
+            order = order_model.get_order(oid)
+            if order and order['route_id']:
+                affected_routes.add(order['route_id'])
+            order_model.update_order_status(oid, new_status)
+        flash(f'{len(order_ids)} sipariş durumu "{new_status}" olarak güncellendi.', 'success')
+
+    elif action == 'delete':
+        for oid in order_ids:
+            order = order_model.get_order(oid)
+            if order and order['route_id']:
+                affected_routes.add(order['route_id'])
+            order_model.delete_order(oid)
+        flash(f'{len(order_ids)} sipariş silindi.', 'success')
+
+    for rid in affected_routes:
+        route_model.update_route_totals(rid)
+
+    return redirect(url_for('orders.index', date=selected_date))
+
+
+@bp.route('/update-status/<int:order_id>', methods=['POST'])
+def update_status(order_id):
+    new_status = request.form.get('status', 'pending')
+    selected_date = request.form.get('date', date.today().isoformat())
+    order = order_model.get_order(order_id)
+    order_model.update_order_status(order_id, new_status)
+    if order and order['route_id']:
+        route_model.update_route_totals(order['route_id'])
+    flash('Durum güncellendi.', 'success')
+    return redirect(url_for('orders.index', date=selected_date))
+
+
 @bp.route('/api/daily-summary/<date_str>')
 def api_daily_summary(date_str):
     summary = order_model.get_daily_summary(date_str)

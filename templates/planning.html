@@ -74,6 +74,7 @@
         {% if planning_data|selectattr('to_buy', 'gt', 0)|list|length > 0 %}
         <div style="margin-top:15px;text-align:right;">
             <form method="POST" action="{{ url_for('planning.generate_purchase') }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="menu_id" value="{{ menu_id }}">
                 <button type="submit" class="btn btn-primary" onclick="return confirm('Eksik malzemeler için satınalma siparişi oluşturulsun mu?')">🛒 Satınalma Siparişi Oluştur</button>
             </form>

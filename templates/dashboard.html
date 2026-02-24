@@ -3,14 +3,15 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- Ana İstatistikler -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-value">{{ daily.total_portions or 0 }}</div>
-        <div class="stat-label">Bugünkü Toplam Porsiyon</div>
+        <div class="stat-label">Toplam Porsiyon</div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ daily.total_orders or 0 }}</div>
-        <div class="stat-label">Bugünkü Sipariş</div>
+        <div class="stat-label">Sipariş Sayısı</div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ routes_today }}</div>
@@ -18,15 +19,140 @@
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ total_customers }}</div>
-        <div class="stat-label">Toplam Müşteri</div>
+        <div class="stat-label">Müşteri</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ total_drivers }}</div>
-        <div class="stat-label">Aktif Şoför</div>
+    {% if low_stock > 0 %}
+    <div class="stat-card" style="border-left:4px solid var(--danger);">
+        <div class="stat-value" style="color:var(--danger);">{{ low_stock }}</div>
+        <div class="stat-label">Düşük Stok Uyarısı</div>
+    </div>
+    {% endif %}
+    {% if unpaid > 0 %}
+    <div class="stat-card" style="border-left:4px solid var(--warning);">
+        <div class="stat-value" style="color:var(--warning);">{{ "%.0f"|format(unpaid) }} TL</div>
+        <div class="stat-label">Ödenmemiş Fatura</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Teslimat Durumu Progress Bar -->
+{% set pending = status_map.get('pending', {}).get('count', 0) %}
+{% set preparing = status_map.get('preparing', {}).get('count', 0) %}
+{% set ready = status_map.get('ready', {}).get('count', 0) %}
+{% set delivered = status_map.get('delivered', {}).get('count', 0) %}
+{% set cancelled = status_map.get('cancelled', {}).get('count', 0) %}
+{% set total_status = pending + preparing + ready + delivered + cancelled %}
+{% if total_status > 0 %}
+<div class="card">
+    <div class="card-header"><h3>Teslimat Durumu</h3></div>
+    <div class="card-body">
+        <div style="display:flex;height:28px;border-radius:var(--radius);overflow:hidden;margin-bottom:12px;">
+            {% if pending > 0 %}<div style="width:{{ (pending/total_status*100)|round(1) }}%;background:var(--warning);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">{{ pending }}</div>{% endif %}
+            {% if preparing > 0 %}<div style="width:{{ (preparing/total_status*100)|round(1) }}%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">{{ preparing }}</div>{% endif %}
+            {% if ready > 0 %}<div style="width:{{ (ready/total_status*100)|round(1) }}%;background:#3498db;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">{{ ready }}</div>{% endif %}
+            {% if delivered > 0 %}<div style="width:{{ (delivered/total_status*100)|round(1) }}%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">{{ delivered }}</div>{% endif %}
+            {% if cancelled > 0 %}<div style="width:{{ (cancelled/total_status*100)|round(1) }}%;background:#95a5a6;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">{{ cancelled }}</div>{% endif %}
+        </div>
+        <div style="display:flex;gap:15px;flex-wrap:wrap;font-size:13px;">
+            <span><span style="display:inline-block;width:12px;height:12px;background:var(--warning);border-radius:3px;vertical-align:middle;"></span> Bekleyen: {{ pending }}</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:var(--primary);border-radius:3px;vertical-align:middle;"></span> Hazırlanıyor: {{ preparing }}</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#3498db;border-radius:3px;vertical-align:middle;"></span> Hazır: {{ ready }}</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:var(--success);border-radius:3px;vertical-align:middle;"></span> Teslim: {{ delivered }}</span>
+            {% if cancelled > 0 %}
+            <span><span style="display:inline-block;width:12px;height:12px;background:#95a5a6;border-radius:3px;vertical-align:middle;"></span> İptal: {{ cancelled }}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <!-- Haftalık Porsiyon Trendi -->
+    <div class="card">
+        <div class="card-header"><h3>Haftalık Porsiyon Trendi</h3></div>
+        <div class="card-body">
+            <canvas id="weeklyChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Kap Tipi Dağılımı -->
+    <div class="card">
+        <div class="card-header"><h3>Kap Tipi Dağılımı</h3></div>
+        <div class="card-body">
+            <canvas id="containerChart" height="200"></canvas>
+        </div>
     </div>
 </div>
 
-<div class="card">
+<!-- Rota Tamamlanma + Bugünün Menüsü + Düşük Stok -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:20px;">
+    <!-- Rota Tamamlanma -->
+    {% if route_progress %}
+    <div class="card">
+        <div class="card-header"><h3>Rota Durumu</h3></div>
+        <div class="card-body">
+            {% for rp in route_progress %}
+            <div style="margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+                    <span><strong>{{ rp.route_name or ('Rota ' ~ rp.id) }}</strong></span>
+                    <span>{{ rp.delivered }}/{{ rp.total }} teslim</span>
+                </div>
+                <div style="height:8px;background:var(--bg-dark);border-radius:4px;overflow:hidden;">
+                    {% if rp.total > 0 %}
+                    <div style="width:{{ (rp.delivered/rp.total*100)|round(0) }}%;height:100%;background:{% if rp.delivered == rp.total %}var(--success){% else %}var(--primary){% endif %};transition:width 0.3s;"></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bugünün Menüsü -->
+    {% if todays_menu %}
+    <div class="card">
+        <div class="card-header"><h3>Bugünün Menüsü</h3></div>
+        <div class="card-body">
+            {% for item in todays_menu %}
+            <div style="padding:6px 0;border-bottom:1px solid var(--bg-dark);font-size:14px;">
+                {% if item.category %}<small style="color:#999;">{{ item.category }}</small><br>{% endif %}
+                <strong>{{ item.item_name }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Düşük Stok Uyarıları -->
+    {% if low_stock_items %}
+    <div class="card" style="border-left:3px solid var(--danger);">
+        <div class="card-header"><h3 style="color:var(--danger);">Düşük Stok</h3></div>
+        <div class="card-body">
+            {% for item in low_stock_items %}
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg-dark);font-size:13px;">
+                <span>{{ item.ingredient_name }}</span>
+                <span style="color:var(--danger);font-weight:600;">{{ "%.1f"|format(item.current_stock) }}/{{ "%.1f"|format(item.min_stock_level) }} {{ item.unit }}</span>
+            </div>
+            {% endfor %}
+            <a href="{{ url_for('inventory.index') }}" class="btn btn-sm btn-outline" style="margin-top:10px;width:100%;">Tüm Stok</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Hızlı İşlemler -->
+    <div class="card">
+        <div class="card-header"><h3>Hızlı İşlemler</h3></div>
+        <div class="card-body">
+            <a href="{{ url_for('orders.index') }}" class="btn btn-primary" style="margin-bottom:8px;width:100%">Sipariş Ekle</a>
+            <a href="{{ url_for('routes.index') }}" class="btn btn-secondary" style="margin-bottom:8px;width:100%">Rota Oluştur</a>
+            <a href="{{ url_for('menu.index') }}" class="btn btn-outline" style="margin-bottom:8px;width:100%">Menü Düzenle</a>
+            <a href="{{ url_for('kitchen.index') }}" class="btn btn-outline" style="width:100%">Mutfak Listesi</a>
+        </div>
+    </div>
+</div>
+
+<!-- Son Siparişler -->
+<div class="card" style="margin-top:20px;">
     <div class="card-header">
         <h3>Bugünkü Son Siparişler</h3>
         <a href="{{ url_for('orders.index') }}" class="btn btn-sm btn-outline">Tümünü Gör</a>
@@ -67,16 +193,77 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
-<div class="stats-grid">
-    <div class="card">
-        <div class="card-header"><h3>Hızlı İşlemler</h3></div>
-        <div class="card-body">
-            <a href="{{ url_for('orders.index') }}" class="btn btn-primary" style="margin-bottom:8px;width:100%">Sipariş Ekle</a>
-            <a href="{{ url_for('routes.index') }}" class="btn btn-secondary" style="margin-bottom:8px;width:100%">Rota Oluştur</a>
-            <a href="{{ url_for('menu.index') }}" class="btn btn-outline" style="margin-bottom:8px;width:100%">Menü Düzenle</a>
-            <a href="{{ url_for('kitchen.index') }}" class="btn btn-outline" style="width:100%">Mutfak Listesi</a>
-        </div>
-    </div>
-</div>
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Haftalık Porsiyon Trendi
+var weeklyData = {{ weekly_trend | map(attribute='portions') | list | tojson }};
+var weeklyLabels = {{ weekly_trend | map(attribute='date') | list | tojson }};
+// Tarihleri kısa formata çevir (Pzt, Sal, Çar...)
+var dayNames = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+weeklyLabels = weeklyLabels.map(function(d) {
+    var dt = new Date(d);
+    return dayNames[dt.getDay()] + ' ' + dt.getDate();
+});
+
+if (document.getElementById('weeklyChart')) {
+    new Chart(document.getElementById('weeklyChart'), {
+        type: 'bar',
+        data: {
+            labels: weeklyLabels,
+            datasets: [{
+                label: 'Porsiyon',
+                data: weeklyData,
+                backgroundColor: 'rgba(230, 126, 34, 0.7)',
+                borderColor: '#e67e22',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 50 } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+// Kap Tipi Dağılımı
+var containerLabels = {{ container_dist | map(attribute='container_type') | list | tojson }};
+var containerData = {{ container_dist | map(attribute='portions') | list | tojson }};
+var containerColors = {
+    'sefer_tasi': '#e67e22', 'paket': '#3498db', 'kuvet': '#2ecc71',
+    'tepsi': '#9b59b6', 'poset': '#e74c3c'
+};
+var bgColors = containerLabels.map(function(l) { return containerColors[l] || '#95a5a6'; });
+containerLabels = containerLabels.map(function(l) { return l.replace('_',' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }); });
+
+if (document.getElementById('containerChart') && containerData.length > 0) {
+    new Chart(document.getElementById('containerChart'), {
+        type: 'doughnut',
+        data: {
+            labels: containerLabels,
+            datasets: [{
+                data: containerData,
+                backgroundColor: bgColors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 15, font: { size: 12 } } }
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

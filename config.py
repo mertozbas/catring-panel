@@ -6,6 +6,7 @@ DATABASE_PATH = os.path.join(BASE_DIR, 'database', 'basak_yemek.db')
 SCHEMA_PATH = os.path.join(BASE_DIR, 'database', 'schema.sql')
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_GROUP_CHAT_ID = os.environ.get('TELEGRAM_GROUP_CHAT_ID', '')
 
 GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '').strip()
 

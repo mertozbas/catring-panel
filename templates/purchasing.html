@@ -50,6 +50,7 @@
             <button class="modal-close" onclick="closeModal('addPurchaseModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('purchasing.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-group">
                     <label>Tedarikçi *</label>
@@ -117,6 +118,7 @@
             <button class="modal-close" onclick="closeModal('addSupplierModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('purchasing.add_supplier') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">

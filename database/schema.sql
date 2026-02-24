@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS customers (
     default_container_type TEXT DEFAULT 'sefer_tasi',
     default_portion_count INTEGER,
     special_notes TEXT,
+    segment TEXT DEFAULT 'normal',
+    unit_price REAL,
     default_route_id INTEGER,
     is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -204,6 +206,8 @@ CREATE TABLE IF NOT EXISTS delivery_confirmations (
     driver_id INTEGER NOT NULL,
     delivered_at TIMESTAMP,
     notes TEXT,
+    problem_type TEXT,
+    problem_notes TEXT,
     FOREIGN KEY (order_id) REFERENCES orders(id),
     FOREIGN KEY (route_id) REFERENCES routes(id),
     FOREIGN KEY (driver_id) REFERENCES drivers(id)
@@ -222,5 +226,60 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     FOREIGN KEY (inventory_id) REFERENCES inventory(id)
 );
 
+-- Ödeme kayıtları (Cari Hesap)
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    invoice_id INTEGER,
+    amount REAL NOT NULL,
+    date DATE NOT NULL,
+    payment_method TEXT DEFAULT 'nakit',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+);
+
+-- Bildirimler
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT,
+    link TEXT,
+    is_read INTEGER DEFAULT 0,
+    target_role TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Varsayılan ERP ayarı
 INSERT OR IGNORE INTO erp_settings (id, erp_mode) VALUES (1, 'builtin');
+
+-- Siparis degisiklik gecmisi
+CREATE TABLE IF NOT EXISTS order_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    field_name TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    changed_by TEXT,
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
+-- Performans indexleri
+CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_route ON orders(route_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_routes_date ON routes(date);
+CREATE INDEX IF NOT EXISTS idx_routes_driver ON routes(driver_id);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases(status);
+CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_order_history_order ON order_history(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);

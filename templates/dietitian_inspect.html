@@ -45,10 +45,12 @@
                             {% if item.is_accepted is none %}
                             <div class="inspect-actions">
                                 <form method="POST" action="{{ url_for('dietitian.inspect_item', purchase_id=purchase.id, item_id=item.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="accepted" value="1">
                                     <button type="submit" class="btn btn-success">✓ Kabul</button>
                                 </form>
                                 <form method="POST" action="{{ url_for('dietitian.inspect_item', purchase_id=purchase.id, item_id=item.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="accepted" value="0">
                                     <input type="text" name="rejection_reason" class="form-control" placeholder="Red sebebi" required>
                                     <button type="submit" class="btn btn-danger">✕ Reddet</button>
@@ -69,6 +71,7 @@
     <div class="card-header"><h3>Kontrolü Tamamla</h3></div>
     <div class="card-body">
         <form method="POST" action="{{ url_for('dietitian.complete_inspection', purchase_id=purchase.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-row">
                 <div class="form-group">
                     <label>Kontrol Eden</label>

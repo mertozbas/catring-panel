@@ -54,6 +54,7 @@
         {% endif %}
 
         <form method="POST" action="{{ url_for('dietitian.add_ingredient', recipe_id=recipe.id) }}" style="margin-top:15px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <h4 style="margin-bottom:10px;">Malzeme Ekle</h4>
             <div class="form-row">
                 <div class="form-group">

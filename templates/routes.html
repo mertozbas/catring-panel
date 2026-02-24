@@ -12,10 +12,12 @@
     </div>
     <div class="toolbar-right">
         <form method="POST" action="{{ url_for('routes.auto_create') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <button type="submit" class="btn btn-secondary">⚡ Rotaları Oluştur</button>
         </form>
         <form method="POST" action="{{ url_for('routes.auto_assign') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <button type="submit" class="btn btn-secondary">⚡ Otomatik Ata</button>
         </form>
@@ -42,6 +44,7 @@
                         <td><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_',' ') | title }}</span></td>
                         <td>
                             <form method="POST" action="{{ url_for('routes.assign') }}" style="display:flex;gap:5px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <input type="hidden" name="order_id" value="{{ o.id }}">
                                 <input type="hidden" name="date" value="{{ selected_date }}">
                                 <select name="route_id" class="form-control" style="width:auto;" required>
@@ -127,6 +130,7 @@
             <button class="modal-close" onclick="closeModal('addRouteModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('routes.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <div class="modal-body">
                 <div class="form-group">

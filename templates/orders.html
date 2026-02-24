@@ -12,6 +12,7 @@
     </div>
     <div class="toolbar-right">
         <form method="POST" action="{{ url_for('orders.generate_daily') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <button type="submit" class="btn btn-secondary" onclick="return confirm('Aktif müşteriler için otomatik sipariş oluşturulsun mu?')">⚡ Günlük Oluştur</button>
         </form>
@@ -44,16 +45,76 @@
 </div>
 {% endif %}
 
-<div class="card">
-    <div class="card-header">
-        <h3>{{ selected_date }} Siparişleri</h3>
+<!-- Filtreleme Toolbar -->
+<div class="card" style="margin-bottom:0;border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;">
+    <div class="card-body" style="padding:10px 15px;">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:600;color:#666;">Filtrele:</span>
+            <select id="filterCustomer" class="form-control" style="width:auto;min-width:150px;padding:5px 8px;font-size:13px;" onchange="applyFilters()">
+                <option value="">Tüm Müşteriler</option>
+                {% set seen_customers = [] %}
+                {% for o in orders %}
+                    {% if o.customer_name not in seen_customers %}
+                        {% if seen_customers.append(o.customer_name) %}{% endif %}
+                        <option value="{{ o.customer_name }}">{{ o.customer_name }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <select id="filterStatus" class="form-control" style="width:auto;min-width:120px;padding:5px 8px;font-size:13px;" onchange="applyFilters()">
+                <option value="">Tüm Durumlar</option>
+                <option value="pending">Bekleyen</option>
+                <option value="preparing">Hazırlanıyor</option>
+                <option value="ready">Hazır</option>
+                <option value="delivered">Teslim</option>
+                <option value="cancelled">İptal</option>
+            </select>
+            <select id="filterContainer" class="form-control" style="width:auto;min-width:120px;padding:5px 8px;font-size:13px;" onchange="applyFilters()">
+                <option value="">Tüm Kaplar</option>
+                {% for val, label in container_types %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select id="filterRoute" class="form-control" style="width:auto;min-width:120px;padding:5px 8px;font-size:13px;" onchange="applyFilters()">
+                <option value="">Tüm Rotalar</option>
+                <option value="none">Atanmadı</option>
+                {% for r in routes %}
+                <option value="{{ r.id }}">{{ r.route_name or r.driver_name }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-sm btn-outline" onclick="clearFilters()" style="font-size:12px;">Temizle</button>
+            <span id="filterCount" style="font-size:12px;color:#999;margin-left:auto;"></span>
+        </div>
     </div>
+</div>
+
+<!-- Toplu İşlem Toolbar (gizli, seçim yapılınca görünür) -->
+<div id="bulkToolbar" style="display:none;background:#2c3e50;color:#fff;padding:10px 15px;border-radius:0;margin-bottom:0;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span id="selectedCount" style="font-weight:600;font-size:14px;">0 seçili</span>
+        <div style="border-left:1px solid rgba(255,255,255,0.3);height:24px;"></div>
+        <form method="POST" action="{{ url_for('orders.bulk_action') }}" id="bulkForm" style="display:flex;gap:8px;align-items:center;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <input type="hidden" name="order_ids" id="bulkOrderIds">
+            <input type="hidden" name="action" id="bulkAction">
+            <input type="hidden" name="new_status" id="bulkNewStatus">
+            <button type="button" class="btn btn-sm" style="background:#27ae60;color:#fff;border:none;" onclick="bulkChangeStatus('preparing')">Hazırlanıyor</button>
+            <button type="button" class="btn btn-sm" style="background:#3498db;color:#fff;border:none;" onclick="bulkChangeStatus('ready')">Hazır</button>
+            <button type="button" class="btn btn-sm" style="background:#2ecc71;color:#fff;border:none;" onclick="bulkChangeStatus('delivered')">Teslim</button>
+            <button type="button" class="btn btn-sm" style="background:#e74c3c;color:#fff;border:none;" onclick="bulkDelete()">Sil</button>
+        </form>
+        <button class="btn btn-sm" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.5);margin-left:auto;" onclick="clearSelection()">Seçimi Kaldır</button>
+    </div>
+</div>
+
+<div class="card" style="border-radius:0 0 var(--radius) var(--radius);margin-top:0;">
     <div class="card-body">
         {% if orders %}
         <div class="table-container">
-            <table class="mobile-cards">
+            <table class="mobile-cards" id="ordersTable">
                 <thead>
                     <tr>
+                        <th style="width:35px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
                         <th>Çeşit</th>
                         <th>Firma</th>
                         <th>Adet</th>
@@ -63,12 +124,13 @@
                         <th class="hide-mobile">Ekstra</th>
                         <th class="hide-mobile">Rota</th>
                         <th>Durum</th>
-                        <th class="hide-phone">İşlem</th>
+                        <th>İşlem</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for o in orders %}
-                    <tr>
+                    <tr data-customer="{{ o.customer_name }}" data-status="{{ o.status }}" data-container="{{ o.container_type }}" data-route="{{ o.route_id or 'none' }}" data-id="{{ o.id }}">
+                        <td><input type="checkbox" class="order-check" value="{{ o.id }}" onchange="updateBulkToolbar()"></td>
                         <td data-label="Çeşit"><strong>{{ o.variety_count }}</strong></td>
                         <td data-label="Firma"><strong>{{ o.customer_name }}</strong></td>
                         <td data-label="Adet"><strong>{{ o.portion_count }}</strong></td>
@@ -76,10 +138,15 @@
                         <td data-label="Kap"><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_', ' ') | title }}</span></td>
                         <td data-label="Not" class="hide-phone">{% if o.special_notes %}<span class="note-highlight">{{ o.special_notes }}</span>{% endif %}</td>
                         <td data-label="Ekstra" class="hide-mobile">{{ o.extra_items or '' }}{% if o.cutlery_needed %} &#127860;{% endif %}</td>
-                        <td data-label="Rota" class="hide-mobile">{{ o.route_id or 'Atanmadı' }}</td>
-                        <td data-label="Durum"><span class="badge badge-{% if o.status == 'delivered' %}success{% elif o.status == 'pending' %}warning{% else %}info{% endif %}">{{ o.status }}</span></td>
-                        <td data-label="İşlem" class="hide-phone">
-                            <a href="{{ url_for('orders.delete', order_id=o.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">Sil</a>
+                        <td data-label="Rota" class="hide-mobile">{% if o.route_id %}{{ o.route_name or ('Rota ' ~ o.route_id) }}{% else %}Atanmadı{% endif %}</td>
+                        <td data-label="Durum">
+                            <span class="badge badge-{% if o.status == 'delivered' %}success{% elif o.status == 'pending' %}warning{% elif o.status == 'cancelled' %}danger{% else %}info{% endif %}">{{ o.status }}</span>
+                        </td>
+                        <td data-label="İşlem">
+                            <div style="display:flex;gap:4px;">
+                                <button class="btn btn-sm btn-outline" onclick="openEditModal({{ o.id }}, '{{ o.customer_id }}', '{{ o.route_id or '' }}', {{ o.variety_count }}, {{ o.portion_count }}, '{{ o.portion_detail or '' }}', '{{ o.container_type }}', '{{ (o.special_notes or '')|replace("'", "\\'") }}', '{{ (o.extra_items or '')|replace("'", "\\'") }}', {{ o.cutlery_needed or 0 }}, '{{ o.status }}', '{{ o.delivery_sequence or '' }}')" title="Düzenle" style="padding:3px 8px;">&#9998;</button>
+                                <a href="{{ url_for('orders.delete', order_id=o.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()" title="Sil" style="padding:3px 8px;">&#10005;</a>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -94,6 +161,7 @@
     </div>
 </div>
 
+<!-- Yeni Sipariş Modal -->
 <div class="modal-overlay" id="addOrderModal">
     <div class="modal">
         <div class="modal-header">
@@ -101,6 +169,7 @@
             <button class="modal-close" onclick="closeModal('addOrderModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('orders.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <div class="modal-body">
                 <div class="form-row">
@@ -171,8 +240,97 @@
     </div>
 </div>
 
+<!-- Sipariş Düzenleme Modal -->
+<div class="modal-overlay" id="editOrderModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Sipariş Düzenle</h3>
+            <button class="modal-close" onclick="closeModal('editOrderModal')">&times;</button>
+        </div>
+        <form method="POST" id="editForm" action="">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Müşteri *</label>
+                        <select name="customer_id" id="edit_customer" class="form-control" required>
+                            {% for c in customers %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rota</label>
+                        <select name="route_id" id="edit_route" class="form-control">
+                            <option value="">Atanmadı</option>
+                            {% for r in routes %}
+                            <option value="{{ r.id }}">{{ r.route_name or r.driver_name + ' - ' + r.service_number|string + '. Servis' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Çeşit Sayısı</label>
+                        <input type="number" name="variety_count" id="edit_variety" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Porsiyon / Adet *</label>
+                        <input type="number" name="portion_count" id="edit_portion" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Porsiyon Detay</label>
+                        <input type="text" name="portion_detail" id="edit_detail" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Kap Tipi</label>
+                        <select name="container_type" id="edit_container" class="form-control">
+                            {% for val, label in container_types %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Teslimat Sırası</label>
+                        <input type="number" name="delivery_sequence" id="edit_sequence" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Durum</label>
+                        <select name="status" id="edit_status" class="form-control">
+                            <option value="pending">Bekleyen</option>
+                            <option value="preparing">Hazırlanıyor</option>
+                            <option value="ready">Hazır</option>
+                            <option value="delivered">Teslim Edildi</option>
+                            <option value="cancelled">İptal</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Özel Notlar</label>
+                    <textarea name="special_notes" id="edit_notes" class="form-control"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Ekstra Kalemler</label>
+                    <input type="text" name="extra_items" id="edit_extras" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" name="cutlery_needed" id="edit_cutlery" value="1"> Çatal-Kaşık Gerekli</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editOrderModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Güncelle</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-document.querySelector('select[name="customer_id"]').addEventListener('change', function() {
+// Yeni sipariş - müşteri seçince varsayılanları doldur
+document.querySelector('#addOrderModal select[name="customer_id"]').addEventListener('change', function() {
     var opt = this.options[this.selectedIndex];
     if (opt.value) {
         document.getElementById('add_variety').value = opt.dataset.variety || 4;
@@ -181,5 +339,104 @@ document.querySelector('select[name="customer_id"]').addEventListener('change', 
         document.getElementById('add_notes').value = opt.dataset.notes || '';
     }
 });
+
+// Düzenleme modal - verileri doldur
+function openEditModal(id, customerId, routeId, variety, portion, detail, container, notes, extras, cutlery, status, sequence) {
+    document.getElementById('editForm').action = '/orders/edit/' + id;
+    document.getElementById('edit_customer').value = customerId;
+    document.getElementById('edit_route').value = routeId;
+    document.getElementById('edit_variety').value = variety;
+    document.getElementById('edit_portion').value = portion;
+    document.getElementById('edit_detail').value = detail;
+    document.getElementById('edit_container').value = container;
+    document.getElementById('edit_notes').value = notes;
+    document.getElementById('edit_extras').value = extras;
+    document.getElementById('edit_cutlery').checked = cutlery == 1;
+    document.getElementById('edit_status').value = status;
+    document.getElementById('edit_sequence').value = sequence;
+    openModal('editOrderModal');
+}
+
+// Filtreleme
+function applyFilters() {
+    var customer = document.getElementById('filterCustomer').value;
+    var status = document.getElementById('filterStatus').value;
+    var container = document.getElementById('filterContainer').value;
+    var route = document.getElementById('filterRoute').value;
+    var rows = document.querySelectorAll('#ordersTable tbody tr');
+    var shown = 0;
+    rows.forEach(function(row) {
+        var show = true;
+        if (customer && row.dataset.customer !== customer) show = false;
+        if (status && row.dataset.status !== status) show = false;
+        if (container && row.dataset.container !== container) show = false;
+        if (route && row.dataset.route !== route) show = false;
+        row.style.display = show ? '' : 'none';
+        if (show) shown++;
+    });
+    var total = rows.length;
+    var countEl = document.getElementById('filterCount');
+    if (customer || status || container || route) {
+        countEl.textContent = shown + '/' + total + ' sipariş gösteriliyor';
+    } else {
+        countEl.textContent = '';
+    }
+}
+
+function clearFilters() {
+    document.getElementById('filterCustomer').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterContainer').value = '';
+    document.getElementById('filterRoute').value = '';
+    applyFilters();
+}
+
+// Toplu seçim
+function toggleSelectAll(el) {
+    var checks = document.querySelectorAll('#ordersTable tbody tr:not([style*="display: none"]) .order-check');
+    checks.forEach(function(cb) { cb.checked = el.checked; });
+    updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+    var checked = document.querySelectorAll('.order-check:checked');
+    var toolbar = document.getElementById('bulkToolbar');
+    var count = document.getElementById('selectedCount');
+    if (checked.length > 0) {
+        toolbar.style.display = 'block';
+        count.textContent = checked.length + ' seçili';
+    } else {
+        toolbar.style.display = 'none';
+    }
+}
+
+function getSelectedIds() {
+    var checked = document.querySelectorAll('.order-check:checked');
+    return Array.from(checked).map(function(cb) { return cb.value; });
+}
+
+function bulkChangeStatus(status) {
+    var ids = getSelectedIds();
+    if (ids.length === 0) return;
+    document.getElementById('bulkOrderIds').value = ids.join(',');
+    document.getElementById('bulkAction').value = 'change_status';
+    document.getElementById('bulkNewStatus').value = status;
+    document.getElementById('bulkForm').submit();
+}
+
+function bulkDelete() {
+    var ids = getSelectedIds();
+    if (ids.length === 0) return;
+    if (!confirm(ids.length + ' sipariş silinecek. Emin misiniz?')) return;
+    document.getElementById('bulkOrderIds').value = ids.join(',');
+    document.getElementById('bulkAction').value = 'delete';
+    document.getElementById('bulkForm').submit();
+}
+
+function clearSelection() {
+    document.querySelectorAll('.order-check').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAll').checked = false;
+    updateBulkToolbar();
+}
 </script>
 {% endblock %}

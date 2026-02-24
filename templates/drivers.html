@@ -66,6 +66,7 @@
             <button class="modal-close" onclick="closeModal('addDriverModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('drivers.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-group">
                     <label>Ad Soyad *</label>
@@ -95,6 +96,7 @@
             <button class="modal-close" onclick="closeModal('editDriverModal')">&times;</button>
         </div>
         <form method="POST" id="editDriverForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-body">
                 <div class="form-group">
                     <label>Ad Soyad *</label>

@@ -4,6 +4,7 @@
 
 {% block content %}
 <form method="POST" action="{{ url_for('menu.save', menu_id=menu.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="toolbar">
         <div class="toolbar-left">
             <a href="{{ url_for('menu.index') }}" class="btn btn-outline">Geri</a>

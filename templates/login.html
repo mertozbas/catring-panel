@@ -105,6 +105,7 @@
         {% endwith %}
 
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group">
                 <label>Kullanıcı Adı</label>
                 <input type="text" name="username" required autofocus placeholder="Kullanıcı adınızı girin">

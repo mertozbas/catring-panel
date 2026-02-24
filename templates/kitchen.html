@@ -3,7 +3,28 @@
 {% block page_title %}Mutfak - Günlük Üretim{% endblock %}
 
 {% block content %}
-<div class="toolbar">
+<style>
+@media print {
+    .sidebar, .topbar, .toolbar, .no-print, nav { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; margin-bottom: 10px !important; }
+    .stats-grid { gap: 5px !important; }
+    .stat-card { padding: 8px !important; }
+    body { font-size: 12px !important; }
+    .badge { border: 1px solid #999 !important; }
+    .print-header { display: block !important; text-align: center; margin-bottom: 15px; }
+    .print-header h2 { margin: 0; }
+    .print-header p { margin: 4px 0 0; color: #666; font-size: 14px; }
+}
+.print-header { display: none; }
+</style>
+
+<div class="print-header">
+    <h2>Başak Yemek - Mutfak Hazırlık Listesi</h2>
+    <p>{{ selected_date }} | Toplam: {{ summary.total_portions or 0 }} porsiyon / {{ summary.total_orders or 0 }} sipariş</p>
+</div>
+
+<div class="toolbar no-print">
     <div class="toolbar-left">
         <div class="date-picker">
             <label>Tarih:</label>
@@ -11,14 +32,17 @@
         </div>
     </div>
     <div class="toolbar-right">
+        <button class="btn btn-outline" onclick="window.print()">🖨 Yazdır</button>
         {% if status_counts.pending > 0 %}
         <form method="POST" action="{{ url_for('kitchen.start_preparing') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <button type="submit" class="btn btn-primary" onclick="return confirm('Tüm bekleyen siparişler hazırlanmaya başlasın mı?')">🔥 Hazırlamaya Başla ({{ status_counts.pending }})</button>
         </form>
         {% endif %}
         {% if status_counts.preparing > 0 %}
         <form method="POST" action="{{ url_for('kitchen.mark_ready') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="date" value="{{ selected_date }}">
             <button type="submit" class="btn btn-secondary" onclick="return confirm('Hazırlanan siparişler tamamlandı olarak işaretlensin mi? Stoklar otomatik düşecek.')">✅ Hazır İşaretle ({{ status_counts.preparing }})</button>
         </form>
@@ -50,34 +74,53 @@
 </div>
 
 {% if prep_list %}
-<div class="card">
-    <div class="card-header"><h3>📋 Hazırlık Listesi</h3></div>
+{% set ns = namespace(has_shortage=false) %}
+{% for item in prep_list %}
+    {% for ing in item.ingredients %}
+        {% if not ing.enough %}{% set ns.has_shortage = true %}{% endif %}
+    {% endfor %}
+{% endfor %}
+
+{% if ns.has_shortage %}
+<div class="card no-print" style="border-left:4px solid var(--danger);background:#fff5f5;margin-bottom:0;border-radius:var(--radius) var(--radius) 0 0;">
+    <div class="card-body" style="padding:12px 20px;">
+        <span style="color:var(--danger);font-weight:700;font-size:15px;">&#9888; Malzeme Eksik!</span>
+        <span style="font-size:13px;color:#666;margin-left:8px;">Aşağıdaki hazırlık listesinde yetersiz stok olan malzemeler kırmızı ile işaretlenmiştir.</span>
+    </div>
+</div>
+{% endif %}
+
+<div class="card" {% if ns.has_shortage %}style="border-radius:0 0 var(--radius) var(--radius);margin-top:0;"{% endif %}>
+    <div class="card-header"><h3>Hazırlık Listesi</h3></div>
     <div class="card-body">
         {% for item in prep_list %}
-        <div class="prep-item">
-            <div class="prep-item-header">
-                <strong style="font-size:16px;">{{ item.item_name }}</strong>
-                <span class="badge">{{ item.total_portions }} porsiyon</span>
+        <div class="prep-item" style="margin-bottom:20px;padding-bottom:16px;{% if not loop.last %}border-bottom:1px solid var(--bg-dark);{% endif %}">
+            <div class="prep-item-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    {% if item.category %}<small style="color:#999;text-transform:uppercase;font-size:11px;">{{ item.category }}</small><br>{% endif %}
+                    <strong style="font-size:16px;">{{ item.item_name }}</strong>
+                </div>
+                <span class="badge" style="font-size:14px;">{{ item.total_portions }} porsiyon</span>
             </div>
             {% if item.recipe and item.recipe.instructions %}
             <p style="margin:8px 0;font-size:13px;color:#666;">{{ item.recipe.instructions }}</p>
             {% endif %}
             {% if item.ingredients %}
             <div style="margin-top:8px;">
-                <table style="width:100%;font-size:13px;">
-                    <tr style="background:var(--bg-dark);"><th style="padding:4px 8px;">Malzeme</th><th>İhtiyaç</th><th>Stok</th><th>Durum</th></tr>
+                <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <tr style="background:var(--bg-dark);"><th style="padding:6px 10px;text-align:left;">Malzeme</th><th style="padding:6px 10px;">İhtiyaç</th><th style="padding:6px 10px;">Stok</th><th style="padding:6px 10px;">Durum</th></tr>
                     {% for ing in item.ingredients %}
-                    <tr style="{% if not ing.enough %}background:#fff3cd;{% endif %}">
-                        <td style="padding:4px 8px;">{{ ing.name }}</td>
-                        <td>{{ ing.needed }} {{ ing.unit }}</td>
-                        <td>{{ ing.stock }} {{ ing.unit }}</td>
-                        <td>{% if ing.enough %}<span style="color:var(--success);">✓</span>{% else %}<span style="color:var(--danger);">✗ Yetersiz</span>{% endif %}</td>
+                    <tr style="{% if not ing.enough %}background:#ffe6e6;{% endif %}border-bottom:1px solid var(--bg-dark);">
+                        <td style="padding:6px 10px;{% if not ing.enough %}color:var(--danger);font-weight:600;{% endif %}">{{ ing.name }}</td>
+                        <td style="padding:6px 10px;text-align:center;">{{ "%.1f"|format(ing.needed) }} {{ ing.unit }}</td>
+                        <td style="padding:6px 10px;text-align:center;">{{ "%.1f"|format(ing.stock) }} {{ ing.unit }}</td>
+                        <td style="padding:6px 10px;text-align:center;">{% if ing.enough %}<span style="color:var(--success);font-weight:600;">&#10003; Yeterli</span>{% else %}<span style="color:var(--danger);font-weight:700;">&#10007; Eksik ({{ "%.1f"|format(ing.needed - ing.stock) }} {{ ing.unit }})</span>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </table>
             </div>
             {% else %}
-            <p style="margin-top:6px;font-size:12px;color:#999;">Tarif tanımlı değil</p>
+            <p style="margin-top:6px;font-size:12px;color:#999;">Tarif tanımlı değil - Diyetisyen tarafından tarif girilmeli</p>
             {% endif %}
         </div>
         {% endfor %}
@@ -124,22 +167,34 @@
 
 {% if route_summary %}
 <div class="card">
-    <div class="card-header"><h3>Rotalara Göre Dağılım</h3></div>
+    <div class="card-header"><h3>Rotalara Göre Dağılım ve Zamanlama</h3></div>
     <div class="card-body">
         <div class="table-container">
             <table>
-                <thead><tr><th>Rota</th><th>Sipariş</th><th>Toplam Porsiyon</th></tr></thead>
+                <thead><tr><th>Rota</th><th>Sipariş</th><th>Toplam Porsiyon</th><th>Tahmini Süre</th><th>Hazır Olmalı</th></tr></thead>
                 <tbody>
                     {% for rs in route_summary %}
+                    {% set deadline_hour = 10 + loop.index0 %}
                     <tr>
                         <td><strong>{{ rs.route_name }}</strong></td>
                         <td>{{ rs.order_count }}</td>
                         <td><strong>{{ rs.total_portions or 0 }}</strong></td>
+                        <td>{{ rs.estimated_duration or '~45' }} dk</td>
+                        <td>
+                            {% if deadline_hour < 11 %}
+                            <span style="color:var(--danger);font-weight:700;">{{ '%02d'|format(deadline_hour) }}:30</span>
+                            {% elif deadline_hour < 12 %}
+                            <span style="color:var(--warning);font-weight:600;">{{ '%02d'|format(deadline_hour) }}:30</span>
+                            {% else %}
+                            <span style="font-weight:600;">{{ '%02d'|format(deadline_hour) }}:30</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <p style="font-size:11px;color:#999;margin-top:8px;">* Zamanlama rotaların sırasına göre otomatik belirlenir. İlk rota en erken, son rota en geç.</p>
     </div>
 </div>
 {% endif %}

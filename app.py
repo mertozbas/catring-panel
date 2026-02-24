@@ -1,12 +1,17 @@
 from flask import Flask, redirect, url_for, session, request
+from flask_wtf.csrf import CSRFProtect
 import config
 from models.db import init_db, close_db
+
+csrf = CSRFProtect()
 
 
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = config.SECRET_KEY
     app.config['DATABASE_PATH'] = config.DATABASE_PATH
+
+    csrf.init_app(app)
 
     init_db(app)
     app.teardown_appcontext(close_db)
@@ -26,6 +31,7 @@ def create_app():
     from blueprints.dietitian import bp as dietitian_bp
     from blueprints.erp import bp as erp_bp
     from blueprints.api import bp as api_bp
+    from blueprints.reports import bp as reports_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp)
@@ -42,6 +48,10 @@ def create_app():
     app.register_blueprint(dietitian_bp, url_prefix='/dietitian')
     app.register_blueprint(erp_bp, url_prefix='/erp')
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(reports_bp, url_prefix='/reports')
+
+    # API endpointlerini CSRF'den muaf tut (bot ve dış API çağrıları için)
+    csrf.exempt(api_bp)
 
     @app.before_request
     def require_login():

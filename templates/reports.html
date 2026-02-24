@@ -1,0 +1,615 @@
+{% extends "base.html" %}
+{% block title %}Raporlar{% endblock %}
+{% block page_title %}Raporlar{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <a href="{{ url_for('reports.index', tab='daily') }}" class="tab {% if tab=='daily' %}active{% endif %}">Gunluk Rapor</a>
+    <a href="{{ url_for('reports.index', tab='weekly') }}" class="tab {% if tab=='weekly' %}active{% endif %}">Haftalik Rapor</a>
+    <a href="{{ url_for('reports.index', tab='customer') }}" class="tab {% if tab=='customer' %}active{% endif %}">Musteri Raporu</a>
+    <a href="{{ url_for('reports.index', tab='stock') }}" class="tab {% if tab=='stock' %}active{% endif %}">Stok Raporu</a>
+    <a href="{{ url_for('reports.index', tab='driver') }}" class="tab {% if tab=='driver' %}active{% endif %}">Sofor Performansi</a>
+</div>
+
+{# ========== GUNLUK RAPOR ========== #}
+{% if tab == 'daily' %}
+<div class="toolbar">
+    <form method="GET" style="display:flex;gap:10px;align-items:center;">
+        <input type="hidden" name="tab" value="daily">
+        <label>Tarih:</label>
+        <input type="date" name="date" value="{{ report_date }}" class="form-control" style="width:170px;">
+        <button type="submit" class="btn btn-sm">Goster</button>
+        <a href="{{ url_for('reports.export_csv', report_type='daily', date=report_date) }}" class="btn btn-sm btn-outline">CSV Indir</a>
+    </form>
+</div>
+
+{% if daily_data %}
+<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="stat-card">
+        <div class="stat-number">{{ daily_data.summary.total_orders }}</div>
+        <div class="stat-label">Toplam Siparis</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ daily_data.summary.total_portions }}</div>
+        <div class="stat-label">Toplam Porsiyon</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--success);">
+        <div class="stat-number" style="color:var(--success);">{{ daily_data.summary.delivered }}</div>
+        <div class="stat-label">Teslim Edilen</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--warning);">
+        <div class="stat-number" style="color:var(--warning);">{{ daily_data.summary.pending + daily_data.summary.preparing + daily_data.summary.ready }}</div>
+        <div class="stat-label">Bekleyen</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--danger);">
+        <div class="stat-number" style="color:var(--danger);">{{ daily_data.summary.cancelled }}</div>
+        <div class="stat-label">Iptal</div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    {# Kap Tipi Dagilimi #}
+    <div class="card">
+        <div class="card-header"><h3>Kap Tipi Dagilimi</h3></div>
+        <div class="card-body">
+            <canvas id="containerChart" height="200"></canvas>
+        </div>
+    </div>
+    {# Rota Ozeti #}
+    <div class="card">
+        <div class="card-header"><h3>Rota Ozeti</h3></div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead><tr>
+                    <th>Rota</th><th>Sofor</th><th>Porsiyon</th><th>Teslim</th><th>Durum</th>
+                </tr></thead>
+                <tbody>
+                {% for r in daily_data.route_summary %}
+                <tr>
+                    <td>{{ r.route_name or '-' }}</td>
+                    <td>{{ r.driver_name }}</td>
+                    <td>{{ r.total_portions or 0 }}</td>
+                    <td>{{ r.delivered_count }}/{{ r.order_count }}</td>
+                    <td><span class="badge badge-{% if r.status=='completed' %}success{% elif r.status=='in_progress' %}warning{% else %}info{% endif %}">{{ r.status }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{# Musteri Siparis Listesi #}
+<div class="card">
+    <div class="card-header"><h3>Siparis Detaylari ({{ daily_data.customer_orders|length }})</h3></div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr>
+                <th>Musteri</th><th>Porsiyon</th><th>Kap</th><th>Durum</th><th>Rota</th><th>Not</th>
+            </tr></thead>
+            <tbody>
+            {% for o in daily_data.customer_orders %}
+            <tr>
+                <td>{{ o.customer_name }}{% if o.segment == 'vip' %} <span class="badge badge-warning" style="font-size:10px;">VIP</span>{% endif %}</td>
+                <td>{{ o.portion_count }}</td>
+                <td><span class="badge badge-{{ o.container_type }}">{{ o.container_type|replace('_',' ')|title }}</span></td>
+                <td><span class="badge badge-{% if o.status=='delivered' %}success{% elif o.status=='cancelled' %}danger{% elif o.status=='ready' %}info{% else %}warning{% endif %}">{{ o.status }}</span></td>
+                <td>{{ o.route_name or '-' }}</td>
+                <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ o.special_notes or '' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if daily_data.problems %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-header" style="background:#fee;"><h3 style="color:var(--danger);">Problemler ({{ daily_data.problems|length }})</h3></div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead><tr><th>Musteri</th><th>Sofor</th><th>Problem</th><th>Aciklama</th><th>Saat</th></tr></thead>
+            <tbody>
+            {% for p in daily_data.problems %}
+            <tr>
+                <td>{{ p.customer_name }}</td>
+                <td>{{ p.driver_name or '-' }}</td>
+                <td><span class="badge badge-danger">{{ p.problem_type }}</span></td>
+                <td>{{ p.problem_notes or '-' }}</td>
+                <td>{{ p.delivered_at[:16] if p.delivered_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<script>
+var containerData = {{ daily_data.container_breakdown | tojson }};
+if (containerData.length > 0) {
+    new Chart(document.getElementById('containerChart'), {
+        type: 'doughnut',
+        data: {
+            labels: containerData.map(function(d) { return d.container_type ? d.container_type.replace('_',' ') : 'Bilinmiyor'; }),
+            datasets: [{
+                data: containerData.map(function(d) { return d.portions; }),
+                backgroundColor: ['#e67e22','#3498db','#2ecc71','#9b59b6','#e74c3c','#f1c40f']
+            }]
+        },
+        options: {responsive: true, plugins: {legend: {position: 'bottom'}}}
+    });
+}
+</script>
+{% else %}
+<div class="card"><div class="card-body"><p style="text-align:center;color:#999;padding:20px;">Tarih secin ve Goster butonuna basin.</p></div></div>
+{% endif %}
+{% endif %}
+
+{# ========== HAFTALIK RAPOR ========== #}
+{% if tab == 'weekly' %}
+<div class="toolbar">
+    <form method="GET" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="hidden" name="tab" value="weekly">
+        <label>Baslangic:</label>
+        <input type="date" name="week_start" value="{{ week_start }}" class="form-control" style="width:160px;">
+        <label>Bitis:</label>
+        <input type="date" name="week_end" value="{{ week_end }}" class="form-control" style="width:160px;">
+        <button type="submit" class="btn btn-sm">Goster</button>
+        <a href="{{ url_for('reports.export_csv', report_type='weekly', week_start=week_start, week_end=week_end) }}" class="btn btn-sm btn-outline">CSV Indir</a>
+    </form>
+</div>
+
+{% if weekly_data %}
+<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="stat-card">
+        <div class="stat-number">{{ weekly_data.totals.total_orders }}</div>
+        <div class="stat-label">Toplam Siparis</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ weekly_data.totals.total_portions }}</div>
+        <div class="stat-label">Toplam Porsiyon</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--success);">
+        <div class="stat-number" style="color:var(--success);">{{ weekly_data.totals.delivered }}</div>
+        <div class="stat-label">Teslim</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ weekly_data.totals.unique_customers }}</div>
+        <div class="stat-label">Farkli Musteri</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid #3498db;">
+        <div class="stat-number" style="color:#3498db;">{{ "%.0f"|format(weekly_data.financial.income) }} TL</div>
+        <div class="stat-label">Gelir</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--danger);">
+        <div class="stat-number" style="color:var(--danger);">{{ "%.0f"|format(weekly_data.financial.expense) }} TL</div>
+        <div class="stat-label">Gider</div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="card">
+        <div class="card-header"><h3>Gunluk Porsiyon Trendi</h3></div>
+        <div class="card-body"><canvas id="weeklyTrendChart" height="200"></canvas></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Kap Tipi Dagilimi</h3></div>
+        <div class="card-body"><canvas id="weeklyContainerChart" height="200"></canvas></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>En Cok Siparis Veren Musteriler</h3></div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead><tr><th>#</th><th>Musteri</th><th>Segment</th><th>Siparis</th><th>Porsiyon</th></tr></thead>
+            <tbody>
+            {% for c in weekly_data.top_customers %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ c.name }}</td>
+                <td><span class="badge">{{ c.segment or 'normal' }}</span></td>
+                <td>{{ c.order_count }}</td>
+                <td><strong>{{ c.total_portions }}</strong></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+var trendData = {{ weekly_data.daily_trend | tojson }};
+new Chart(document.getElementById('weeklyTrendChart'), {
+    type: 'bar',
+    data: {
+        labels: trendData.map(function(d) { return d.date; }),
+        datasets: [{
+            label: 'Porsiyon',
+            data: trendData.map(function(d) { return d.total_portions; }),
+            backgroundColor: '#e67e22'
+        }, {
+            label: 'Teslim',
+            data: trendData.map(function(d) { return d.delivered; }),
+            backgroundColor: '#2ecc71'
+        }]
+    },
+    options: {responsive: true, scales: {y: {beginAtZero: true}}}
+});
+
+var cwData = {{ weekly_data.container_weekly | tojson }};
+if (cwData.length > 0) {
+    new Chart(document.getElementById('weeklyContainerChart'), {
+        type: 'doughnut',
+        data: {
+            labels: cwData.map(function(d) { return d.container_type ? d.container_type.replace('_',' ') : '?'; }),
+            datasets: [{
+                data: cwData.map(function(d) { return d.portions; }),
+                backgroundColor: ['#e67e22','#3498db','#2ecc71','#9b59b6','#e74c3c','#f1c40f']
+            }]
+        },
+        options: {responsive: true, plugins: {legend: {position: 'bottom'}}}
+    });
+}
+</script>
+{% endif %}
+{% endif %}
+
+{# ========== MUSTERI RAPORU ========== #}
+{% if tab == 'customer' %}
+<div class="toolbar">
+    <form method="GET" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="hidden" name="tab" value="customer">
+        <select name="customer_id" class="form-control" style="width:200px;">
+            <option value="">Musteri secin...</option>
+            {% for c in customers %}
+            <option value="{{ c.id }}" {% if customer_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        <label>Baslangic:</label>
+        <input type="date" name="period_start" value="{{ period_start }}" class="form-control" style="width:160px;">
+        <label>Bitis:</label>
+        <input type="date" name="period_end" value="{{ period_end }}" class="form-control" style="width:160px;">
+        <button type="submit" class="btn btn-sm">Goster</button>
+        {% if customer_data %}
+        <a href="{{ url_for('reports.export_csv', report_type='customer', customer_id=customer_id, period_start=period_start, period_end=period_end) }}" class="btn btn-sm btn-outline">CSV Indir</a>
+        {% endif %}
+    </form>
+</div>
+
+{% if customer_data %}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3>{{ customer_data.customer.name }}
+        {% if customer_data.customer.segment == 'vip' %}<span class="badge badge-warning">VIP</span>{% endif %}
+    </h3></div>
+    <div class="card-body">
+        <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;">
+            <div class="stat-card">
+                <div class="stat-number">{{ customer_data.stats.total_orders }}</div>
+                <div class="stat-label">Siparis</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ customer_data.stats.total_portions }}</div>
+                <div class="stat-label">Porsiyon</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ customer_data.stats.avg_portions or 0 }}</div>
+                <div class="stat-label">Ort. Porsiyon</div>
+            </div>
+            <div class="stat-card" style="border-left:3px solid var(--success);">
+                <div class="stat-number" style="color:var(--success);">{{ customer_data.stats.delivered }}</div>
+                <div class="stat-label">Teslim</div>
+            </div>
+            <div class="stat-card" style="border-left:3px solid var(--danger);">
+                <div class="stat-number" style="color:var(--danger);">{{ "%.0f"|format(customer_data.balance.total_debt - customer_data.balance.total_paid) }} TL</div>
+                <div class="stat-label">Bakiye</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="card">
+        <div class="card-header"><h3>Porsiyon Trendi</h3></div>
+        <div class="card-body"><canvas id="custTrendChart" height="180"></canvas></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Odeme Gecmisi</h3></div>
+        <div class="card-body">
+            {% if customer_data.payments %}
+            <table class="data-table">
+                <thead><tr><th>Tarih</th><th>Tutar</th><th>Yontem</th></tr></thead>
+                <tbody>
+                {% for p in customer_data.payments %}
+                <tr>
+                    <td>{{ p.date }}</td>
+                    <td><strong>{{ "%.0f"|format(p.amount) }} TL</strong></td>
+                    <td>{{ p.payment_method }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="text-align:center;color:#999;padding:15px;">Odeme kaydi yok</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Siparis Gecmisi</h3></div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Tarih</th><th>Porsiyon</th><th>Kap</th><th>Durum</th><th>Rota</th></tr></thead>
+            <tbody>
+            {% for o in customer_data.orders %}
+            <tr>
+                <td>{{ o.date }}</td>
+                <td>{{ o.portion_count }}</td>
+                <td><span class="badge badge-{{ o.container_type }}">{{ o.container_type|replace('_',' ')|title }}</span></td>
+                <td><span class="badge badge-{% if o.status=='delivered' %}success{% elif o.status=='cancelled' %}danger{% else %}warning{% endif %}">{{ o.status }}</span></td>
+                <td>{{ o.route_name or '-' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+var custDaily = {{ customer_data.daily | tojson }};
+new Chart(document.getElementById('custTrendChart'), {
+    type: 'line',
+    data: {
+        labels: custDaily.map(function(d) { return d.date; }),
+        datasets: [{
+            label: 'Porsiyon',
+            data: custDaily.map(function(d) { return d.portions; }),
+            borderColor: '#e67e22',
+            backgroundColor: 'rgba(230,126,34,0.1)',
+            fill: true, tension: 0.3
+        }]
+    },
+    options: {responsive: true, scales: {y: {beginAtZero: true}}}
+});
+</script>
+{% elif customer_id %}
+<div class="card"><div class="card-body"><p style="text-align:center;color:#999;padding:20px;">Musteri bulunamadi.</p></div></div>
+{% else %}
+<div class="card"><div class="card-body"><p style="text-align:center;color:#999;padding:20px;">Musteri secin ve Goster butonuna basin.</p></div></div>
+{% endif %}
+{% endif %}
+
+{# ========== STOK RAPORU ========== #}
+{% if tab == 'stock' %}
+<div class="toolbar">
+    <a href="{{ url_for('reports.export_csv', report_type='stock') }}" class="btn btn-sm btn-outline">CSV Indir</a>
+</div>
+
+{% if stock_data %}
+{% if stock_data.low_stock %}
+<div class="card" style="margin-bottom:20px;border:2px solid var(--danger);">
+    <div class="card-header" style="background:#fee;"><h3 style="color:var(--danger);">Dusuk Stok Uyarilari ({{ stock_data.low_stock|length }})</h3></div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead><tr><th>Malzeme</th><th>Mevcut</th><th>Minimum</th><th>Birim</th><th>Eksik</th></tr></thead>
+            <tbody>
+            {% for s in stock_data.low_stock %}
+            <tr style="background:#fff5f5;">
+                <td><strong>{{ s.ingredient_name }}</strong></td>
+                <td style="color:var(--danger);font-weight:700;">{{ "%.1f"|format(s.current_stock) }}</td>
+                <td>{{ "%.1f"|format(s.min_stock_level) }}</td>
+                <td>{{ s.unit }}</td>
+                <td style="color:var(--danger);">{{ "%.1f"|format(s.min_stock_level - s.current_stock) }} {{ s.unit }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="card">
+        <div class="card-header"><h3>Son 7 Gun Tuketim</h3></div>
+        <div class="card-body">
+            {% if stock_data.consumption %}
+            <table class="data-table">
+                <thead><tr><th>Malzeme</th><th>Tuketim</th><th>Birim</th></tr></thead>
+                <tbody>
+                {% for c in stock_data.consumption %}
+                <tr>
+                    <td>{{ c.ingredient_name }}</td>
+                    <td><strong>{{ "%.1f"|format(c.consumed_7d) }}</strong></td>
+                    <td>{{ c.unit }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="text-align:center;color:#999;padding:15px;">Tuketim verisi yok</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Son 7 Gun Giris</h3></div>
+        <div class="card-body">
+            {% if stock_data.incoming %}
+            <table class="data-table">
+                <thead><tr><th>Malzeme</th><th>Miktar</th><th>Birim</th></tr></thead>
+                <tbody>
+                {% for i in stock_data.incoming %}
+                <tr>
+                    <td>{{ i.ingredient_name }}</td>
+                    <td><strong style="color:var(--success);">+{{ "%.1f"|format(i.received_7d) }}</strong></td>
+                    <td>{{ i.unit }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="text-align:center;color:#999;padding:15px;">Giris verisi yok</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Tum Stok ({{ stock_data.all_stock|length }} kalem)</h3></div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Malzeme</th><th>Mevcut Stok</th><th>Min Stok</th><th>Birim</th><th>Durum</th></tr></thead>
+            <tbody>
+            {% for s in stock_data.all_stock %}
+            {% set is_low = s.min_stock_level and s.current_stock < s.min_stock_level %}
+            <tr {% if is_low %}style="background:#fff5f5;"{% endif %}>
+                <td>{{ s.ingredient_name }}</td>
+                <td {% if is_low %}style="color:var(--danger);font-weight:700;"{% endif %}>{{ "%.1f"|format(s.current_stock) }}</td>
+                <td>{{ "%.1f"|format(s.min_stock_level) if s.min_stock_level else '-' }}</td>
+                <td>{{ s.unit }}</td>
+                <td>
+                    {% if is_low %}
+                    <span class="badge badge-danger">DUSUK</span>
+                    {% else %}
+                    <span class="badge badge-success">Normal</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+{# ========== SOFOR PERFORMANSI ========== #}
+{% if tab == 'driver' %}
+<div class="toolbar">
+    <form method="GET" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="hidden" name="tab" value="driver">
+        <label>Baslangic:</label>
+        <input type="date" name="driver_start" value="{{ driver_start }}" class="form-control" style="width:160px;">
+        <label>Bitis:</label>
+        <input type="date" name="driver_end" value="{{ driver_end }}" class="form-control" style="width:160px;">
+        <button type="submit" class="btn btn-sm">Goster</button>
+        <a href="{{ url_for('reports.export_csv', report_type='driver', driver_start=driver_start, driver_end=driver_end) }}" class="btn btn-sm btn-outline">CSV Indir</a>
+    </form>
+</div>
+
+{% if driver_data %}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3>Sofor Performans Ozeti</h3></div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr>
+                <th>Sofor</th><th>Rota</th><th>Siparis</th><th>Teslim</th><th>Iptal</th>
+                <th>Porsiyon</th><th>KM</th><th>Tamamlama %</th>
+            </tr></thead>
+            <tbody>
+            {% for d in driver_data.drivers %}
+            <tr>
+                <td><strong>{{ d.name }}</strong></td>
+                <td>{{ d.route_count }}</td>
+                <td>{{ d.total_orders }}</td>
+                <td style="color:var(--success);font-weight:600;">{{ d.delivered }}</td>
+                <td style="color:var(--danger);">{{ d.cancelled }}</td>
+                <td><strong>{{ d.total_portions }}</strong></td>
+                <td>{{ "%.1f"|format(d.total_km or 0) }}</td>
+                <td>
+                    {% set pct = ((d.delivered / d.total_orders * 100) if d.total_orders else 0)|int %}
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="flex:1;background:#eee;border-radius:4px;height:8px;min-width:60px;">
+                            <div style="width:{{ pct }}%;background:{% if pct >= 80 %}var(--success){% elif pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};height:100%;border-radius:4px;"></div>
+                        </div>
+                        <span style="font-size:12px;">{{ pct }}%</span>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="card">
+        <div class="card-header"><h3>Porsiyon Karsilastirmasi</h3></div>
+        <div class="card-body"><canvas id="driverChart" height="200"></canvas></div>
+    </div>
+
+    {% if driver_data.problems %}
+    <div class="card">
+        <div class="card-header" style="background:#fee;"><h3 style="color:var(--danger);">Problem Istatistikleri</h3></div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead><tr><th>Sofor</th><th>Problem</th><th>Sayi</th></tr></thead>
+                <tbody>
+                {% for p in driver_data.problems %}
+                <tr>
+                    <td>{{ p.driver_name }}</td>
+                    <td><span class="badge badge-danger">{{ p.problem_type }}</span></td>
+                    <td>{{ p.count }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-header"><h3>Problemler</h3></div>
+        <div class="card-body"><p style="text-align:center;color:#999;padding:20px;">Bu donemde problem kaydi yok</p></div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Gunluk Rota Detaylari</h3></div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Tarih</th><th>Sofor</th><th>Porsiyon</th><th>Siparis</th><th>Teslim</th><th>Rota Durumu</th></tr></thead>
+            <tbody>
+            {% for d in driver_data.daily_driver %}
+            <tr>
+                <td>{{ d.date }}</td>
+                <td>{{ d.driver_name }}</td>
+                <td>{{ d.total_portions or 0 }}</td>
+                <td>{{ d.order_count }}</td>
+                <td>{{ d.delivered }}</td>
+                <td><span class="badge badge-{% if d.route_status=='completed' %}success{% elif d.route_status=='in_progress' %}warning{% else %}info{% endif %}">{{ d.route_status }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+var driverData = {{ driver_data.drivers | tojson }};
+new Chart(document.getElementById('driverChart'), {
+    type: 'bar',
+    data: {
+        labels: driverData.map(function(d) { return d.name; }),
+        datasets: [{
+            label: 'Toplam Porsiyon',
+            data: driverData.map(function(d) { return d.total_portions; }),
+            backgroundColor: '#e67e22'
+        }, {
+            label: 'Teslim Edilen',
+            data: driverData.map(function(d) { return d.delivered; }),
+            backgroundColor: '#2ecc71'
+        }]
+    },
+    options: {responsive: true, scales: {y: {beginAtZero: true}}}
+});
+</script>
+{% endif %}
+{% endif %}
+
+{% endblock %}

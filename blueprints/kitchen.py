@@ -24,7 +24,8 @@ def index():
 
     route_summary = query_db(
         '''SELECT r.route_name, r.id as route_id,
-                  COUNT(o.id) as order_count, SUM(o.portion_count) as total_portions
+                  COUNT(o.id) as order_count, SUM(o.portion_count) as total_portions,
+                  r.optimized_duration_min as estimated_duration
            FROM routes r
            LEFT JOIN orders o ON o.route_id = r.id AND o.date = r.date
            WHERE r.date = ?

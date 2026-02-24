@@ -6,6 +6,7 @@
 <div class="toolbar">
     <div class="toolbar-left">
         <form method="POST" action="{{ url_for('menu.create') }}" style="display:flex;gap:8px;align-items:end;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group" style="margin:0;">
                 <label style="font-size:12px;">Hafta Başlangıcı (Pazartesi)</label>
                 <input type="date" name="week_start_date" class="form-control" required>
