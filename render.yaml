@@ -3,7 +3,7 @@ services:
     name: catring-panel
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python database/migrate.py && gunicorn "app:create_app()" --bind 0.0.0.0:$PORT
+    startCommand: bash start.sh
     envVars:
       - key: SECRET_KEY
         generateValue: true
