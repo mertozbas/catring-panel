@@ -19,3 +19,6 @@ OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-5-nano-2025-08-07')
 FLASK_HOST = '0.0.0.0'
 FLASK_PORT = int(os.environ.get('PORT', '5050'))
 FLASK_DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+
+# Agent tool'ları bu URL üzerinden Flask API'ye bağlanır
+API_BASE = os.environ.get('API_BASE', f'http://localhost:{FLASK_PORT}/api')

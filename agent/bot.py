@@ -178,13 +178,35 @@ def get_updates(offset=None):
         return []
 
 
+def wait_for_api():
+    """Flask API'nin ayağa kalkmasını bekler."""
+    from agent.tools.order_tools import API_BASE
+    api_url = API_BASE.replace('/api', '/')
+    print(f"API bekleniyor: {api_url}")
+    for i in range(30):
+        try:
+            resp = requests.get(api_url, timeout=2, allow_redirects=True)
+            if resp.status_code < 500:
+                print(f"API hazır! (deneme {i+1})")
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    print("UYARI: API 60 saniyede ayağa kalkmadı, yine de devam ediliyor.")
+    return False
+
+
 def run_bot():
     """Bot'u long-polling ile çalıştırır."""
     print("=" * 50)
     print("Başak Yemek Telegram Bot başlatılıyor...")
     print(f"Model: OpenAI {config.OPENAI_MODEL}")
     print(f"API Key: {os.environ.get('OPENAI_API_KEY', '')[:15]}...")
+    print(f"API Base: {config.API_BASE}")
     print("=" * 50)
+
+    # Flask API'nin hazır olmasını bekle
+    wait_for_api()
 
     agent = create_agent()
     print("Agent oluşturuldu!")

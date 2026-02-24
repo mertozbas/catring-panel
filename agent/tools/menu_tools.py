@@ -1,7 +1,10 @@
 import requests
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import config
 from strands import tool
 
-API_BASE = "http://localhost:5050/api"
+API_BASE = config.API_BASE
 
 
 @tool
