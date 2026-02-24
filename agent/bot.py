@@ -139,6 +139,38 @@ def create_agent():
     return agent
 
 
+def send_chat_action(chat_id, action="typing"):
+    """Telegram'da 'yazıyor...' animasyonu gösterir."""
+    url = f"{TELEGRAM_API_IP}/sendChatAction"
+    payload = {"chat_id": chat_id, "action": action}
+    try:
+        tg_session.post(url, json=payload, timeout=5)
+    except Exception:
+        pass
+
+
+class TypingIndicator:
+    """Agent düşünürken 'yazıyor...' animasyonunu sürekli gönderir."""
+    def __init__(self, chat_id):
+        self.chat_id = chat_id
+        self._stop = False
+        self._thread = None
+
+    def start(self):
+        import threading
+        self._stop = False
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop = True
+
+    def _loop(self):
+        while not self._stop:
+            send_chat_action(self.chat_id, "typing")
+            time.sleep(4)  # Telegram typing 5sn sürer, 4sn'de yenile
+
+
 def send_telegram_message(chat_id, text):
     """Telegram'a mesaj gönderir."""
     url = f"{TELEGRAM_API_IP}/sendMessage"
@@ -245,8 +277,15 @@ def run_bot():
 
                 # Agent ile konuşma
                 try:
+                    # Yazıyor animasyonunu başlat
+                    typing = TypingIndicator(chat_id)
+                    typing.start()
+
                     prompt = f"Kullanıcı ({user_name}, chat_id: {chat_id}): {user_text}"
                     result = agent(prompt)
+
+                    # Yazıyor animasyonunu durdur
+                    typing.stop()
 
                     # Strands agent result'tan düz text çıkar
                     response_text = extract_text_from_result(result)
@@ -258,6 +297,7 @@ def run_bot():
                     send_telegram_message(chat_id, response_text)
                     print(f"<<< [BOT]: {response_text[:150]}...")
                 except Exception as e:
+                    typing.stop()
                     print(f"!!! Agent hatası: {e}")
                     traceback.print_exc()
                     send_telegram_message(chat_id,
