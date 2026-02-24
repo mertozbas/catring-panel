@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Depo{% endblock %}
+{% block page_title %}Depo / Stok Takibi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <input type="text" id="inventorySearch" class="form-control" placeholder="Malzeme ara..." style="width:250px;">
+        {% if low_stock %}
+        <span class="badge badge-danger" style="padding:8px 12px;font-size:13px;margin-left:10px;">{{ low_stock|length }} düşük stoklu malzeme!</span>
+        {% endif %}
+    </div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addItemModal')">+ Malzeme Ekle</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Stok Listesi ({{ items|length }} kalem)</h3></div>
+    <div class="card-body">
+        {% if items %}
+        <div class="table-container">
+            <table id="inventoryTable">
+                <thead>
+                    <tr><th>Malzeme</th><th>Mevcut Stok</th><th>Birim</th><th>Min. Stok</th><th>Durum</th><th>İşlem</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr {% if item.current_stock <= item.min_stock_level %}style="background:#fff3cd;"{% endif %}>
+                        <td><strong>{{ item.ingredient_name }}</strong></td>
+                        <td>{{ item.current_stock }}</td>
+                        <td>{{ item.unit }}</td>
+                        <td>{{ item.min_stock_level }}</td>
+                        <td>
+                            {% if item.current_stock <= item.min_stock_level %}
+                            <span class="badge badge-danger">Düşük</span>
+                            {% else %}
+                            <span class="badge badge-success">Yeterli</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('inventory.adjust', item_id=item.id) }}" style="display:inline-flex;gap:5px;">
+                                <input type="number" step="any" name="quantity_change" class="form-control" style="width:80px;" placeholder="+/-">
+                                <button type="submit" class="btn btn-sm btn-outline">Güncelle</button>
+                            </form>
+                            <a href="{{ url_for('inventory.delete', item_id=item.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">Sil</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Henüz malzeme eklenmemiş.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addItemModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Malzeme</h3>
+            <button class="modal-close" onclick="closeModal('addItemModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('inventory.add') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Malzeme Adı *</label>
+                        <input type="text" name="ingredient_name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Birim *</label>
+                        <select name="unit" class="form-control" required>
+                            <option value="kg">kg</option>
+                            <option value="lt">lt</option>
+                            <option value="adet">adet</option>
+                            <option value="paket">paket</option>
+                            <option value="kutu">kutu</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mevcut Stok</label>
+                        <input type="number" step="any" name="current_stock" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Min. Stok Seviyesi</label>
+                        <input type="number" step="any" name="min_stock_level" class="form-control" value="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addItemModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('inventorySearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var filter = this.value.toLowerCase().trim();
+            var rows = document.querySelectorAll('#inventoryTable tbody tr');
+            rows.forEach(function(row) {
+                var name = row.querySelector('td:first-child');
+                if (name) {
+                    row.style.display = name.textContent.toLowerCase().includes(filter) ? '' : 'none';
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

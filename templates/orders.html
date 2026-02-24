@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Siparişler{% endblock %}
+{% block page_title %}Sipariş Yönetimi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div class="date-picker">
+            <label>Tarih:</label>
+            <input type="date" id="orderDate" value="{{ selected_date }}" onchange="window.location.href='/orders?date='+this.value">
+        </div>
+    </div>
+    <div class="toolbar-right">
+        <form method="POST" action="{{ url_for('orders.generate_daily') }}" style="display:inline;">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <button type="submit" class="btn btn-secondary" onclick="return confirm('Aktif müşteriler için otomatik sipariş oluşturulsun mu?')">⚡ Günlük Oluştur</button>
+        </form>
+        <button class="btn btn-primary" onclick="openModal('addOrderModal')">+ Yeni Sipariş</button>
+    </div>
+</div>
+
+{% if summary %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.total_portions or 0 }}</div>
+        <div class="stat-label">Toplam Porsiyon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.total_orders or 0 }}</div>
+        <div class="stat-label">Sipariş Sayısı</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.sefer_tasi or 0 }}</div>
+        <div class="stat-label">Sefer Tası</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.paket or 0 }}</div>
+        <div class="stat-label">Paket</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.kuvet or 0 }}</div>
+        <div class="stat-label">Küvet</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>{{ selected_date }} Siparişleri</h3>
+    </div>
+    <div class="card-body">
+        {% if orders %}
+        <div class="table-container">
+            <table class="mobile-cards">
+                <thead>
+                    <tr>
+                        <th>Çeşit</th>
+                        <th>Firma</th>
+                        <th>Adet</th>
+                        <th class="hide-mobile">Detay</th>
+                        <th>Kap</th>
+                        <th class="hide-phone">Özel Not</th>
+                        <th class="hide-mobile">Ekstra</th>
+                        <th class="hide-mobile">Rota</th>
+                        <th>Durum</th>
+                        <th class="hide-phone">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td data-label="Çeşit"><strong>{{ o.variety_count }}</strong></td>
+                        <td data-label="Firma"><strong>{{ o.customer_name }}</strong></td>
+                        <td data-label="Adet"><strong>{{ o.portion_count }}</strong></td>
+                        <td data-label="Detay" class="hide-mobile">{{ o.portion_detail or '' }}</td>
+                        <td data-label="Kap"><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_', ' ') | title }}</span></td>
+                        <td data-label="Not" class="hide-phone">{% if o.special_notes %}<span class="note-highlight">{{ o.special_notes }}</span>{% endif %}</td>
+                        <td data-label="Ekstra" class="hide-mobile">{{ o.extra_items or '' }}{% if o.cutlery_needed %} &#127860;{% endif %}</td>
+                        <td data-label="Rota" class="hide-mobile">{{ o.route_id or 'Atanmadı' }}</td>
+                        <td data-label="Durum"><span class="badge badge-{% if o.status == 'delivered' %}success{% elif o.status == 'pending' %}warning{% else %}info{% endif %}">{{ o.status }}</span></td>
+                        <td data-label="İşlem" class="hide-phone">
+                            <a href="{{ url_for('orders.delete', order_id=o.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete()">Sil</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>Bu tarih için sipariş yok.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addOrderModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Sipariş</h3>
+            <button class="modal-close" onclick="closeModal('addOrderModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('orders.add') }}">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Müşteri *</label>
+                        <select name="customer_id" class="form-control" required>
+                            <option value="">Seçin...</option>
+                            {% for c in customers %}
+                            <option value="{{ c.id }}" data-variety="{{ c.default_variety_count }}" data-container="{{ c.default_container_type }}" data-portion="{{ c.default_portion_count or '' }}" data-notes="{{ c.special_notes or '' }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rota</label>
+                        <select name="route_id" class="form-control">
+                            <option value="">Atanmadı</option>
+                            {% for r in routes %}
+                            <option value="{{ r.id }}">{{ r.route_name or r.driver_name + ' - ' + r.service_number|string + '. Servis' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Çeşit Sayısı</label>
+                        <input type="number" name="variety_count" id="add_variety" class="form-control" value="4">
+                    </div>
+                    <div class="form-group">
+                        <label>Porsiyon / Adet *</label>
+                        <input type="number" name="portion_count" id="add_portion" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Porsiyon Detay</label>
+                        <input type="text" name="portion_detail" class="form-control" placeholder="1+1+1+2+4">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Kap Tipi</label>
+                        <select name="container_type" id="add_container" class="form-control">
+                            {% for val, label in container_types %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Teslimat Sırası</label>
+                        <input type="number" name="delivery_sequence" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Özel Notlar</label>
+                    <textarea name="special_notes" id="add_notes" class="form-control" placeholder="Bol kepçe, çorbalı bol vb."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Ekstra Kalemler</label>
+                    <input type="text" name="extra_items" class="form-control" placeholder="Pilav +5 porsiyon fazla olacak">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" name="cutlery_needed" value="1"> Çatal-Kaşık Gerekli</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addOrderModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.querySelector('select[name="customer_id"]').addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    if (opt.value) {
+        document.getElementById('add_variety').value = opt.dataset.variety || 4;
+        document.getElementById('add_container').value = opt.dataset.container || 'sefer_tasi';
+        document.getElementById('add_portion').value = opt.dataset.portion || '';
+        document.getElementById('add_notes').value = opt.dataset.notes || '';
+    }
+});
+</script>
+{% endblock %}

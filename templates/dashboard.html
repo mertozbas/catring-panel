@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ daily.total_portions or 0 }}</div>
+        <div class="stat-label">Bugünkü Toplam Porsiyon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ daily.total_orders or 0 }}</div>
+        <div class="stat-label">Bugünkü Sipariş</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ routes_today }}</div>
+        <div class="stat-label">Aktif Rota</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ total_customers }}</div>
+        <div class="stat-label">Toplam Müşteri</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ total_drivers }}</div>
+        <div class="stat-label">Aktif Şoför</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Bugünkü Son Siparişler</h3>
+        <a href="{{ url_for('orders.index') }}" class="btn btn-sm btn-outline">Tümünü Gör</a>
+    </div>
+    <div class="card-body">
+        {% if recent_orders %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Firma</th>
+                        <th>Porsiyon</th>
+                        <th>Kap Tipi</th>
+                        <th>Çeşit</th>
+                        <th>Özel Not</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td><strong>{{ order.customer_name }}</strong></td>
+                        <td>{{ order.portion_count }}{% if order.portion_detail %} <small>({{ order.portion_detail }})</small>{% endif %}</td>
+                        <td><span class="badge badge-{{ order.container_type }}">{{ order.container_type | replace('_', ' ') | title }}</span></td>
+                        <td>{{ order.variety_count }}</td>
+                        <td>{% if order.special_notes %}<span class="note-highlight">{{ order.special_notes }}</span>{% endif %}</td>
+                        <td><span class="badge badge-{% if order.status == 'delivered' %}success{% elif order.status == 'pending' %}warning{% else %}info{% endif %}">{{ order.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9998;</div>
+            <p>Bugün henüz sipariş yok.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="card">
+        <div class="card-header"><h3>Hızlı İşlemler</h3></div>
+        <div class="card-body">
+            <a href="{{ url_for('orders.index') }}" class="btn btn-primary" style="margin-bottom:8px;width:100%">Sipariş Ekle</a>
+            <a href="{{ url_for('routes.index') }}" class="btn btn-secondary" style="margin-bottom:8px;width:100%">Rota Oluştur</a>
+            <a href="{{ url_for('menu.index') }}" class="btn btn-outline" style="margin-bottom:8px;width:100%">Menü Düzenle</a>
+            <a href="{{ url_for('kitchen.index') }}" class="btn btn-outline" style="width:100%">Mutfak Listesi</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

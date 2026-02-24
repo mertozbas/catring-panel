@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Haftalık Menü{% endblock %}
+{% block page_title %}Haftalık Menü Yönetimi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <form method="POST" action="{{ url_for('menu.create') }}" style="display:flex;gap:8px;align-items:end;">
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:12px;">Hafta Başlangıcı (Pazartesi)</label>
+                <input type="date" name="week_start_date" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">+ Yeni Menü</button>
+        </form>
+    </div>
+</div>
+
+{% if menus %}
+{% for m in menus %}
+<div class="card">
+    <div class="card-header">
+        <h3>{{ m.week_start_date }} Haftası</h3>
+        <div>
+            <span class="badge badge-{% if m.status=='published' %}success{% elif m.status=='approved' %}info{% else %}warning{% endif %}">{{ m.status | title }}</span>
+            <a href="{{ url_for('menu.edit', menu_id=m.id) }}" class="btn btn-sm btn-outline" style="margin-left:8px;">Düzenle</a>
+            <a href="{{ url_for('menu.print_menu', menu_id=m.id) }}" class="btn btn-sm btn-secondary" target="_blank">Yazdır</a>
+            <a href="{{ url_for('menu.pdf', menu_id=m.id) }}" class="btn btn-sm btn-secondary">PDF</a>
+            {% if m.status != 'published' %}
+            <a href="{{ url_for('menu.publish', menu_id=m.id) }}" class="btn btn-sm btn-success">Yayınla</a>
+            {% endif %}
+            <a href="{{ url_for('menu.delete', menu_id=m.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete('Bu menüyü silmek istediğinize emin misiniz?')">Sil</a>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <div class="icon">&#9749;</div>
+            <p>Henüz menü oluşturulmamış.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

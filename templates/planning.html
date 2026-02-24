@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Malzeme Planlama{% endblock %}
+{% block page_title %}Malzeme İhtiyaç Planlama{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <form method="GET" style="display:flex;gap:8px;align-items:end;">
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:12px;">Menü Seçin</label>
+                <select name="menu_id" class="form-control" onchange="this.form.submit()">
+                    <option value="">Menü seçin...</option>
+                    {% for m in menus %}
+                    <option value="{{ m.id }}" {% if menu_id and menu_id|int == m.id %}selected{% endif %}>{{ m.week_start_date }} Haftası</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if selected_menu %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_portions }}</div>
+        <div class="stat-label">Tahmini Günlük Porsiyon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ planning_data|length }}</div>
+        <div class="stat-label">Malzeme Çeşidi</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ planning_data|selectattr('to_buy', 'gt', 0)|list|length }}</div>
+        <div class="stat-label">Satın Alınacak</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>{{ selected_menu.week_start_date }} Haftası Malzeme İhtiyacı</h3>
+    </div>
+    <div class="card-body">
+        {% if planning_data %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Malzeme</th>
+                        <th>Birim</th>
+                        <th>Haftalık İhtiyaç</th>
+                        <th>Mevcut Stok</th>
+                        <th>Satın Alınacak</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in planning_data %}
+                    <tr {% if item.to_buy > 0 %}style="background:#fff3cd;"{% endif %}>
+                        <td><strong>{{ item.ingredient_name }}</strong></td>
+                        <td>{{ item.unit }}</td>
+                        <td>{{ item.needed }}</td>
+                        <td>{{ item.current_stock }}</td>
+                        <td>
+                            {% if item.to_buy > 0 %}
+                            <strong style="color:var(--danger);">{{ item.to_buy }}</strong>
+                            {% else %}
+                            <span style="color:var(--success);">Yeterli</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if planning_data|selectattr('to_buy', 'gt', 0)|list|length > 0 %}
+        <div style="margin-top:15px;text-align:right;">
+            <form method="POST" action="{{ url_for('planning.generate_purchase') }}" style="display:inline;">
+                <input type="hidden" name="menu_id" value="{{ menu_id }}">
+                <button type="submit" class="btn btn-primary" onclick="return confirm('Eksik malzemeler için satınalma siparişi oluşturulsun mu?')">🛒 Satınalma Siparişi Oluştur</button>
+            </form>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <p>Bu menü için tarif bilgisi bulunamadı. Önce Diyetisyen panelinden tarifleri ekleyin.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <div class="icon">&#9776;</div>
+            <p>Malzeme ihtiyacını hesaplamak için yukarıdan bir menü seçin.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

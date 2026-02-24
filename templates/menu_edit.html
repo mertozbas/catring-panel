@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Menü Düzenle{% endblock %}
+{% block page_title %}Menü Düzenle - {{ menu.week_start_date }}{% endblock %}
+
+{% block content %}
+<form method="POST" action="{{ url_for('menu.save', menu_id=menu.id) }}">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <a href="{{ url_for('menu.index') }}" class="btn btn-outline">Geri</a>
+        </div>
+        <div class="toolbar-right">
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+    </div>
+
+    <div class="menu-grid">
+        {% for day in range(6) %}
+        <div class="menu-day-card">
+            <div class="menu-day-header">{{ day_names[day] }}</div>
+            <div class="menu-day-body">
+                <div class="form-group">
+                    <label>Çorba</label>
+                    <input type="text" name="item_{{ day }}_1" class="form-control" value="{{ menu_data[day][1] }}" placeholder="Ezogelin Çorbası">
+                </div>
+                <div class="form-group">
+                    <label>Ana Yemek</label>
+                    <input type="text" name="item_{{ day }}_2" class="form-control" value="{{ menu_data[day][2] }}" placeholder="Rosto Köfte-Püre">
+                </div>
+                <div class="form-group">
+                    <label>Garnitür / Yan</label>
+                    <input type="text" name="item_{{ day }}_3" class="form-control" value="{{ menu_data[day][3] }}" placeholder="Pilav">
+                </div>
+                <div class="form-group">
+                    <label>Tatlı / İçecek</label>
+                    <input type="text" name="item_{{ day }}_4" class="form-control" value="{{ menu_data[day][4] }}" placeholder="Yoğurt">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</form>
+{% endblock %}

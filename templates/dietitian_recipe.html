@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Tarif Detay{% endblock %}
+{% block page_title %}{{ recipe.menu_item_name }}{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="{{ url_for('dietitian.index', tab='recipes') }}" class="btn btn-outline">Geri</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{% if recipe.per_person_cost %}{{ "%.2f"|format(recipe.per_person_cost) }} TL{% else %}-{% endif %}</div>
+        <div class="stat-label">Kişi Başı Maliyet</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ ingredients|length }}</div>
+        <div class="stat-label">Malzeme Sayısı</div>
+    </div>
+</div>
+
+{% if recipe.instructions %}
+<div class="card">
+    <div class="card-header"><h3>Yapılış Tarifi</h3></div>
+    <div class="card-body">
+        <p>{{ recipe.instructions }}</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>Malzemeler (Kişi Başı)</h3>
+    </div>
+    <div class="card-body">
+        {% if ingredients %}
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Malzeme</th><th>Kişi Başı Miktar</th><th>Birim</th></tr></thead>
+                <tbody>
+                    {% for ing in ingredients %}
+                    <tr>
+                        <td><strong>{{ ing.ingredient_name }}</strong></td>
+                        <td>{{ ing.quantity_per_person }}</td>
+                        <td>{{ ing.unit }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Malzeme eklenmemiş.</p></div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('dietitian.add_ingredient', recipe_id=recipe.id) }}" style="margin-top:15px;">
+            <h4 style="margin-bottom:10px;">Malzeme Ekle</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <input type="text" name="ingredient_name" class="form-control" placeholder="Malzeme adı" required>
+                </div>
+                <div class="form-group">
+                    <input type="number" step="any" name="quantity_per_person" class="form-control" placeholder="Kişi başı miktar" required>
+                </div>
+                <div class="form-group">
+                    <select name="unit" class="form-control" required>
+                        <option value="kg">kg</option>
+                        <option value="lt">lt</option>
+                        <option value="adet">adet</option>
+                        <option value="gr">gr</option>
+                        <option value="ml">ml</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Ekle</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

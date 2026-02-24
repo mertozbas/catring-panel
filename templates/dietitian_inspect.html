@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Mal Kontrol{% endblock %}
+{% block page_title %}Mal Kontrol - {{ purchase.supplier_name }}{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="{{ url_for('dietitian.index') }}" class="btn btn-outline">Geri</a>
+    </div>
+    <div class="toolbar-right">
+        {% set pending_count = items|selectattr('is_accepted', 'none')|list|length %}
+        {% set accepted_count = items|selectattr('is_accepted', 'equalto', 1)|list|length %}
+        {% set rejected_count = items|selectattr('is_accepted', 'equalto', 0)|list|length %}
+        <span class="badge badge-warning" style="padding:8px 12px;">{{ pending_count }} Bekliyor</span>
+        <span class="badge badge-success" style="padding:8px 12px;">{{ accepted_count }} Kabul</span>
+        <span class="badge badge-danger" style="padding:8px 12px;">{{ rejected_count }} Red</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Kalemler</h3></div>
+    <div class="card-body">
+        {% if items %}
+        <div class="table-container">
+            <table class="mobile-cards">
+                <thead>
+                    <tr><th>Malzeme</th><th>Miktar</th><th>Birim</th><th>Durum</th><th>Kontrol</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td data-label="Malzeme"><strong>{{ item.ingredient_name }}</strong></td>
+                        <td data-label="Miktar">{{ item.quantity }}</td>
+                        <td data-label="Birim">{{ item.unit }}</td>
+                        <td data-label="Durum">
+                            {% if item.is_accepted == 1 %}
+                            <span class="badge badge-success">Kabul</span>
+                            {% elif item.is_accepted == 0 %}
+                            <span class="badge badge-danger">Red: {{ item.rejection_reason or '' }}</span>
+                            {% else %}
+                            <span class="badge badge-warning">Bekliyor</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Kontrol">
+                            {% if item.is_accepted is none %}
+                            <div class="inspect-actions">
+                                <form method="POST" action="{{ url_for('dietitian.inspect_item', purchase_id=purchase.id, item_id=item.id) }}">
+                                    <input type="hidden" name="accepted" value="1">
+                                    <button type="submit" class="btn btn-success">✓ Kabul</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('dietitian.inspect_item', purchase_id=purchase.id, item_id=item.id) }}">
+                                    <input type="hidden" name="accepted" value="0">
+                                    <input type="text" name="rejection_reason" class="form-control" placeholder="Red sebebi" required>
+                                    <button type="submit" class="btn btn-danger">✕ Reddet</button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Kontrolü Tamamla</h3></div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('dietitian.complete_inspection', purchase_id=purchase.id) }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Kontrol Eden</label>
+                    <input type="text" name="inspected_by" class="form-control" value="Diyetisyen">
+                </div>
+                <div class="form-group">
+                    <label>Notlar</label>
+                    <textarea name="notes" class="form-control"></textarea>
+                </div>
+            </div>
+            {% if pending_count > 0 %}
+            <button type="button" class="btn btn-outline" disabled style="cursor:not-allowed;">
+                {{ pending_count }} kalem bekliyor - Önce tüm kalemleri kontrol edin
+            </button>
+            {% else %}
+            <button type="submit" class="btn btn-success" onclick="return confirm('Kontrolü tamamlamak istediğinize emin misiniz? Kabul edilen kalemler stoka eklenecek.')">
+                Kontrolü Tamamla ({{ accepted_count }} kabul, {{ rejected_count }} red)
+            </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}

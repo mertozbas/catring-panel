@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Haftalık Yemek Listesi</title>
+    <style>
+        @page { size: A4; margin: 15mm; }
+        body { font-family: Arial, sans-serif; color: #333; margin: 0; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { font-size: 11px; color: #666; margin: 3px 0; }
+        .menu-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .menu-table th, .menu-table td { border: 2px solid #333; padding: 12px; text-align: center; vertical-align: top; }
+        .menu-table th { background: #2c3e50; color: white; font-size: 14px; }
+        .menu-table .day-header { font-weight: bold; font-size: 13px; }
+        .menu-table .date-header { font-size: 11px; color: #666; }
+        .menu-table td { font-size: 14px; font-weight: 600; line-height: 1.6; }
+        .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #666; }
+        @media print { body { padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <p>MENÜLERİMİZ HER HAFTA YENİLENMEKTEDİR.</p>
+        <p>KİŞİ BAŞI BİR ÖĞÜN ORTALAMA 1000 KALORİ ÜZERİDİR.</p>
+        <p>YEMEKLERİMİZ HİJYENİK ORTAMDA,</p>
+        <p>MARKALI VE KALİTELİ MALZEMELERLE ÜRETİLMEKTEDİR.</p>
+        <h1>HAFTALIK YEMEK LİSTESİ</h1>
+    </div>
+
+    <table class="menu-table">
+        <thead>
+            <tr>
+                {% for day in range(3) %}
+                <th>{{ day_names[day] }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                {% for day in range(3) %}
+                <td>
+                    {% for item in menu_data.get(day, []) %}
+                    {{ item | upper }}<br>
+                    {% endfor %}
+                </td>
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+
+    <table class="menu-table" style="margin-top: 15px;">
+        <thead>
+            <tr>
+                {% for day in range(3, 6) %}
+                <th>{{ day_names[day] }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                {% for day in range(3, 6) %}
+                <td>
+                    {% for item in menu_data.get(day, []) %}
+                    {{ item | upper }}<br>
+                    {% endfor %}
+                </td>
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>BAŞAK YEMEK CATERİNG - Afiyet Olsun!</p>
+    </div>
+
+    <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>

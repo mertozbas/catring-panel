@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Satınalma Detay{% endblock %}
+{% block page_title %}Satınalma Detay - {{ purchase.supplier_name }}{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <a href="{{ url_for('purchasing.index') }}" class="btn btn-outline">Geri</a>
+    </div>
+    <div class="toolbar-right">
+        {% if purchase.status == 'pending' %}
+        <form method="POST" action="{{ url_for('purchasing.receive', purchase_id=purchase.id) }}" style="display:inline;">
+            <button type="submit" class="btn btn-primary" onclick="return confirm('Bu satınalma teslim alındı olarak işaretlensin mi?')">📦 Teslim Al</button>
+        </form>
+        {% endif %}
+        <span class="badge badge-{% if purchase.status=='inspected' %}success{% elif purchase.status=='received' %}info{% else %}warning{% endif %}" style="font-size:14px;padding:8px 15px;">{{ purchase.status | title }}</span>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ purchase.date }}</div>
+        <div class="stat-label">Tarih</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.2f"|format(purchase.total_amount) }} TL</div>
+        <div class="stat-label">Toplam Tutar</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ items|length }}</div>
+        <div class="stat-label">Kalem Sayısı</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Kalemler</h3>
+        <button class="btn btn-sm btn-primary" onclick="openModal('addItemModal')">+ Kalem Ekle</button>
+    </div>
+    <div class="card-body">
+        {% if items %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Malzeme</th><th>Miktar</th><th>Birim</th><th>Birim Fiyat</th><th>Toplam</th><th>Kontrol</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td><strong>{{ item.ingredient_name }}</strong></td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.unit }}</td>
+                        <td>{{ "%.2f"|format(item.unit_price or 0) }} TL</td>
+                        <td>{{ "%.2f"|format(item.total_price or 0) }} TL</td>
+                        <td>
+                            {% if item.is_accepted %}
+                            <span class="badge badge-success">Kabul</span>
+                            {% elif item.rejection_reason %}
+                            <span class="badge badge-danger">Red: {{ item.rejection_reason }}</span>
+                            {% else %}
+                            <span class="badge badge-warning">Bekliyor</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Kalem eklenmemiş.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addItemModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Kalem Ekle</h3>
+            <button class="modal-close" onclick="closeModal('addItemModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('purchasing.add_item', purchase_id=purchase.id) }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Malzeme *</label>
+                        <input type="text" name="ingredient_name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Birim *</label>
+                        <select name="unit" class="form-control" required>
+                            <option value="kg">kg</option>
+                            <option value="lt">lt</option>
+                            <option value="adet">adet</option>
+                            <option value="paket">paket</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Miktar *</label>
+                        <input type="number" step="any" name="quantity" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Birim Fiyat (TL)</label>
+                        <input type="number" step="any" name="unit_price" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addItemModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Ekle</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

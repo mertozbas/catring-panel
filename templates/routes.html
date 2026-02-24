@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Rotalar{% endblock %}
+{% block page_title %}Rota Yönetimi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div class="date-picker">
+            <label>Tarih:</label>
+            <input type="date" id="routeDate" value="{{ selected_date }}" onchange="window.location.href='/routes?date='+this.value">
+        </div>
+    </div>
+    <div class="toolbar-right">
+        <form method="POST" action="{{ url_for('routes.auto_create') }}" style="display:inline;">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <button type="submit" class="btn btn-secondary">⚡ Rotaları Oluştur</button>
+        </form>
+        <form method="POST" action="{{ url_for('routes.auto_assign') }}" style="display:inline;">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <button type="submit" class="btn btn-secondary">⚡ Otomatik Ata</button>
+        </form>
+        <button class="btn btn-primary" onclick="openModal('addRouteModal')">+ Yeni Rota</button>
+    </div>
+</div>
+
+{% if unassigned %}
+<div class="card" style="border-color: var(--warning);">
+    <div class="card-header" style="background: #fff3cd;">
+        <h3>Rotaya Atanmamış Siparişler ({{ unassigned|length }})</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Firma</th><th>Porsiyon</th><th>Kap</th><th>Rotaya Ata</th></tr>
+                </thead>
+                <tbody>
+                    {% for o in unassigned %}
+                    <tr>
+                        <td>{{ o.customer_name }}</td>
+                        <td>{{ o.portion_count }}</td>
+                        <td><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_',' ') | title }}</span></td>
+                        <td>
+                            <form method="POST" action="{{ url_for('routes.assign') }}" style="display:flex;gap:5px;">
+                                <input type="hidden" name="order_id" value="{{ o.id }}">
+                                <input type="hidden" name="date" value="{{ selected_date }}">
+                                <select name="route_id" class="form-control" style="width:auto;" required>
+                                    <option value="">Rota seç</option>
+                                    {% for r in routes %}
+                                    <option value="{{ r.id }}">{{ r.route_name or r.driver_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="number" name="delivery_sequence" class="form-control" style="width:60px;" placeholder="Sıra">
+                                <button type="submit" class="btn btn-sm btn-primary">Ata</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% for r in routes %}
+<div class="card">
+    <div class="card-header">
+        <h3>{{ r.route_name or (r.driver_name + ' - ' + r.service_number|string + '. Servis') }}</h3>
+        <div>
+            <span class="badge badge-{% if r.status=='completed' %}success{% elif r.status=='in_progress' %}info{% else %}warning{% endif %}">{{ r.status }}</span>
+            <span style="margin-left:10px;font-size:13px;">
+                Toplam: <strong>{{ r.total_portions }}</strong> |
+                S.Tası: {{ r.total_sefer_tasi }} |
+                Paket: {{ r.total_paket }} |
+                Küvet: {{ r.total_kuvet }} |
+                Tepsi: {{ r.total_tepsi }} |
+                Poşet: {{ r.total_poset }}
+            </span>
+            <a href="{{ url_for('routes.delete', route_id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirmDelete('Bu rotayı silmek istediğinize emin misiniz?')" style="margin-left:10px;">Sil</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if route_orders.get(r.id) %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Sıra</th><th>Çeşit</th><th>Firma</th><th>Adet</th><th>Kap</th><th>Özel Not</th><th>Ekstra</th></tr>
+                </thead>
+                <tbody>
+                    {% for o in route_orders[r.id] %}
+                    <tr>
+                        <td>{{ o.delivery_sequence or '-' }}</td>
+                        <td><strong>{{ o.variety_count }}</strong></td>
+                        <td><strong>{{ o.customer_name }}</strong></td>
+                        <td>{{ o.portion_count }}{% if o.portion_detail %} <small>({{ o.portion_detail }})</small>{% endif %}</td>
+                        <td><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_',' ') | title }}</span></td>
+                        <td>{% if o.special_notes %}<span class="note-highlight">{{ o.special_notes }}</span>{% endif %}</td>
+                        <td>{{ o.extra_items or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Bu rotada sipariş yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% if not routes %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <div class="icon">&#9873;</div>
+            <p>Bu tarih için rota oluşturulmamış.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="modal-overlay" id="addRouteModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Rota</h3>
+            <button class="modal-close" onclick="closeModal('addRouteModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('routes.add') }}">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Şoför *</label>
+                    <select name="driver_id" class="form-control" required>
+                        <option value="">Seçin...</option>
+                        {% for d in drivers %}
+                        <option value="{{ d.id }}">{{ d.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Servis No</label>
+                        <input type="number" name="service_number" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Rota Adı</label>
+                        <input type="text" name="route_name" class="form-control" placeholder="Koray Bey - 1. Servis">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addRouteModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Oluştur</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

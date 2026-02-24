@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Mutfak{% endblock %}
+{% block page_title %}Mutfak - Günlük Üretim{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div class="date-picker">
+            <label>Tarih:</label>
+            <input type="date" value="{{ selected_date }}" onchange="window.location.href='/kitchen?date='+this.value">
+        </div>
+    </div>
+    <div class="toolbar-right">
+        {% if status_counts.pending > 0 %}
+        <form method="POST" action="{{ url_for('kitchen.start_preparing') }}" style="display:inline;">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <button type="submit" class="btn btn-primary" onclick="return confirm('Tüm bekleyen siparişler hazırlanmaya başlasın mı?')">🔥 Hazırlamaya Başla ({{ status_counts.pending }})</button>
+        </form>
+        {% endif %}
+        {% if status_counts.preparing > 0 %}
+        <form method="POST" action="{{ url_for('kitchen.mark_ready') }}" style="display:inline;">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <button type="submit" class="btn btn-secondary" onclick="return confirm('Hazırlanan siparişler tamamlandı olarak işaretlensin mi? Stoklar otomatik düşecek.')">✅ Hazır İşaretle ({{ status_counts.preparing }})</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.total_portions or 0 }}</div>
+        <div class="stat-label">Toplam Porsiyon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.total_orders or 0 }}</div>
+        <div class="stat-label">Sipariş Sayısı</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color:var(--warning);">{{ status_counts.pending }}</div>
+        <div class="stat-label">Bekliyor</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color:var(--primary);">{{ status_counts.preparing }}</div>
+        <div class="stat-label">Hazırlanıyor</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color:var(--success);">{{ status_counts.ready + status_counts.delivered }}</div>
+        <div class="stat-label">Hazır / Teslim</div>
+    </div>
+</div>
+
+{% if prep_list %}
+<div class="card">
+    <div class="card-header"><h3>📋 Hazırlık Listesi</h3></div>
+    <div class="card-body">
+        {% for item in prep_list %}
+        <div class="prep-item">
+            <div class="prep-item-header">
+                <strong style="font-size:16px;">{{ item.item_name }}</strong>
+                <span class="badge">{{ item.total_portions }} porsiyon</span>
+            </div>
+            {% if item.recipe and item.recipe.instructions %}
+            <p style="margin:8px 0;font-size:13px;color:#666;">{{ item.recipe.instructions }}</p>
+            {% endif %}
+            {% if item.ingredients %}
+            <div style="margin-top:8px;">
+                <table style="width:100%;font-size:13px;">
+                    <tr style="background:var(--bg-dark);"><th style="padding:4px 8px;">Malzeme</th><th>İhtiyaç</th><th>Stok</th><th>Durum</th></tr>
+                    {% for ing in item.ingredients %}
+                    <tr style="{% if not ing.enough %}background:#fff3cd;{% endif %}">
+                        <td style="padding:4px 8px;">{{ ing.name }}</td>
+                        <td>{{ ing.needed }} {{ ing.unit }}</td>
+                        <td>{{ ing.stock }} {{ ing.unit }}</td>
+                        <td>{% if ing.enough %}<span style="color:var(--success);">✓</span>{% else %}<span style="color:var(--danger);">✗ Yetersiz</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <p style="margin-top:6px;font-size:12px;color:#999;">Tarif tanımlı değil</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if menu_items %}
+<div class="card">
+    <div class="card-header"><h3>Bugünün Menüsü</h3></div>
+    <div class="card-body">
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            {% for item in menu_items %}
+            <div style="padding:10px 20px;background:var(--bg);border-radius:var(--radius);font-weight:600;">
+                {{ item.item_name }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if container_summary %}
+<div class="card">
+    <div class="card-header"><h3>Kap Tipine Göre Dağılım</h3></div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Kap Tipi</th><th>Sipariş Sayısı</th><th>Toplam Porsiyon</th></tr></thead>
+                <tbody>
+                    {% for cs in container_summary %}
+                    <tr>
+                        <td><span class="badge badge-{{ cs.container_type }}">{{ cs.container_type | replace('_',' ') | title }}</span></td>
+                        <td>{{ cs.order_count }}</td>
+                        <td><strong>{{ cs.total_portions }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if route_summary %}
+<div class="card">
+    <div class="card-header"><h3>Rotalara Göre Dağılım</h3></div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Rota</th><th>Sipariş</th><th>Toplam Porsiyon</th></tr></thead>
+                <tbody>
+                    {% for rs in route_summary %}
+                    <tr>
+                        <td><strong>{{ rs.route_name }}</strong></td>
+                        <td>{{ rs.order_count }}</td>
+                        <td><strong>{{ rs.total_portions or 0 }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><h3>Tüm Siparişler (Detay)</h3></div>
+    <div class="card-body">
+        {% if orders %}
+        <div class="table-container">
+            <table class="mobile-cards">
+                <thead>
+                    <tr><th>Çeşit</th><th>Firma</th><th>Adet</th><th>Kap</th><th>Özel Not</th><th>Durum</th></tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td data-label="Çeşit">{{ o.variety_count }}</td>
+                        <td data-label="Firma"><strong>{{ o.customer_name }}</strong></td>
+                        <td data-label="Adet"><strong>{{ o.portion_count }}</strong>{% if o.portion_detail %} <small>({{ o.portion_detail }})</small>{% endif %}</td>
+                        <td data-label="Kap"><span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_',' ') | title }}</span></td>
+                        <td data-label="Not">{% if o.special_notes %}<span class="note-highlight">{{ o.special_notes }}</span>{% endif %}</td>
+                        <td data-label="Durum"><span class="badge badge-{% if o.status == 'delivered' %}success{% elif o.status == 'ready' %}success{% elif o.status == 'preparing' %}info{% else %}warning{% endif %}">{{ o.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Bugün için sipariş yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Diyetisyen{% endblock %}
+{% block page_title %}Diyetisyen Paneli{% endblock %}
+
+{% block content %}
+<div class="tab-nav">
+    <a href="?tab=inspection" class="{% if tab == 'inspection' %}active{% endif %}">Mal Kabul / Kontrol</a>
+    <a href="?tab=recipes" class="{% if tab == 'recipes' %}active{% endif %}">Tarifler</a>
+</div>
+
+{% if tab == 'inspection' %}
+<div class="card">
+    <div class="card-header"><h3>Kontrol Bekleyen Satınalmalar</h3></div>
+    <div class="card-body">
+        {% if pending_purchases %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Tarih</th><th>Tedarikçi</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in pending_purchases %}
+                    <tr>
+                        <td>{{ p.date }}</td>
+                        <td><strong>{{ p.supplier_name }}</strong></td>
+                        <td>{{ "%.2f"|format(p.total_amount) }} TL</td>
+                        <td><span class="badge badge-warning">{{ p.status }}</span></td>
+                        <td><a href="{{ url_for('dietitian.inspect', purchase_id=p.id) }}" class="btn btn-sm btn-primary">Kontrol Et</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Kontrol bekleyen satınalma yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+{% elif tab == 'recipes' %}
+<div class="toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addRecipeModal')">+ Yeni Tarif</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if recipes %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Yemek Adı</th><th>Kişi Başı Maliyet</th><th>İşlem</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in recipes %}
+                    <tr>
+                        <td><strong>{{ r.menu_item_name }}</strong></td>
+                        <td>{% if r.per_person_cost %}{{ "%.2f"|format(r.per_person_cost) }} TL{% else %}-{% endif %}</td>
+                        <td><a href="{{ url_for('dietitian.recipe_detail', recipe_id=r.id) }}" class="btn btn-sm btn-outline">Detay</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Tarif eklenmemiş.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addRecipeModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Tarif</h3>
+            <button class="modal-close" onclick="closeModal('addRecipeModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('dietitian.add_recipe') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Yemek Adı *</label>
+                    <input type="text" name="menu_item_name" class="form-control" required placeholder="Ezogelin Çorbası">
+                </div>
+                <div class="form-group">
+                    <label>Kişi Başı Maliyet (TL)</label>
+                    <input type="number" step="any" name="per_person_cost" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Yapılış Tarifi</label>
+                    <textarea name="instructions" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addRecipeModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

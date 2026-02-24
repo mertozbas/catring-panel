@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block title %}Müşteriler{% endblock %}
+{% block page_title %}Müşteri Yönetimi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <form method="GET" style="display:flex;gap:8px;">
+            <input type="text" name="q" class="form-control" placeholder="Firma ara..." value="{{ q }}" style="width:250px;">
+            <button type="submit" class="btn btn-outline">Ara</button>
+        </form>
+    </div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addCustomerModal')">+ Yeni Müşteri</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if customers %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Firma Adı</th>
+                        <th>İletişim</th>
+                        <th>Telefon</th>
+                        <th>Vars. Çeşit</th>
+                        <th>Vars. Kap</th>
+                        <th>Vars. Porsiyon</th>
+                        <th>Özel Not</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in customers %}
+                    <tr>
+                        <td><strong>{{ c.name }}</strong></td>
+                        <td>{{ c.contact_name or '-' }}</td>
+                        <td>{{ c.phone or '-' }}</td>
+                        <td>{{ c.default_variety_count }}</td>
+                        <td><span class="badge badge-{{ c.default_container_type }}">{{ c.default_container_type | replace('_', ' ') | title }}</span></td>
+                        <td>{{ c.default_portion_count or '-' }}</td>
+                        <td>{% if c.special_notes %}<span class="note-highlight">{{ c.special_notes }}</span>{% endif %}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline" onclick="editCustomer({{ c.id }}, '{{ c.name }}', '{{ c.contact_name or '' }}', '{{ c.phone or '' }}', '{{ c.telegram_chat_id or '' }}', '{{ c.address or '' }}', '{{ c.latitude or '' }}', '{{ c.longitude or '' }}', {{ c.default_variety_count }}, '{{ c.default_container_type }}', '{{ c.default_portion_count or '' }}', '{{ c.special_notes or '' }}')">Düzenle</button>
+                            {% if c.is_active %}
+                            <a href="{{ url_for('customers.toggle', customer_id=c.id, active=0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Pasif yapmak istediğinize emin misiniz?')">Pasif</a>
+                            {% else %}
+                            <a href="{{ url_for('customers.toggle', customer_id=c.id, active=1) }}" class="btn btn-sm btn-success">Aktif</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9734;</div>
+            <p>Henüz müşteri eklenmemiş.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addCustomerModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Müşteri</h3>
+            <button class="modal-close" onclick="closeModal('addCustomerModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('customers.add') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Firma Adı *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>İletişim Kişisi</label>
+                        <input type="text" name="contact_name" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Telefon</label>
+                        <input type="text" name="phone" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Telegram Chat ID</label>
+                        <input type="text" name="telegram_chat_id" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Adres</label>
+                    <textarea name="address" class="form-control"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Enlem (Latitude)</label>
+                        <input type="number" step="any" name="latitude" id="add_latitude" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Boylam (Longitude)</label>
+                        <input type="number" step="any" name="longitude" id="add_longitude" class="form-control">
+                    </div>
+                </div>
+                {% if google_maps_key %}
+                <div class="form-group">
+                    <label>Haritada Konum Seç <small>(tıklayarak seçin)</small></label>
+                    <div id="addMap" class="map-picker"></div>
+                </div>
+                {% endif %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Varsayılan Çeşit Sayısı</label>
+                        <input type="number" name="default_variety_count" class="form-control" value="4">
+                    </div>
+                    <div class="form-group">
+                        <label>Varsayılan Kap Tipi</label>
+                        <select name="default_container_type" class="form-control">
+                            <option value="sefer_tasi">Sefer Tası</option>
+                            <option value="paket">Paket</option>
+                            <option value="kuvet">Küvet</option>
+                            <option value="tepsi">Tepsi</option>
+                            <option value="poset">Poşet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Varsayılan Porsiyon</label>
+                        <input type="number" name="default_portion_count" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Özel Notlar</label>
+                    <textarea name="special_notes" class="form-control" placeholder="Bol kepçe, çorbalı bol vb."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addCustomerModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editCustomerModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Müşteri Düzenle</h3>
+            <button class="modal-close" onclick="closeModal('editCustomerModal')">&times;</button>
+        </div>
+        <form method="POST" id="editForm">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Firma Adı *</label>
+                        <input type="text" name="name" id="edit_name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>İletişim Kişisi</label>
+                        <input type="text" name="contact_name" id="edit_contact_name" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Telefon</label>
+                        <input type="text" name="phone" id="edit_phone" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Telegram Chat ID</label>
+                        <input type="text" name="telegram_chat_id" id="edit_telegram_chat_id" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Adres</label>
+                    <textarea name="address" id="edit_address" class="form-control"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Enlem</label>
+                        <input type="number" step="any" name="latitude" id="edit_latitude" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Boylam</label>
+                        <input type="number" step="any" name="longitude" id="edit_longitude" class="form-control">
+                    </div>
+                </div>
+                {% if google_maps_key %}
+                <div class="form-group">
+                    <label>Haritada Konum <small>(tıklayarak değiştirin)</small></label>
+                    <div id="editMap" class="map-picker"></div>
+                </div>
+                {% endif %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Varsayılan Çeşit</label>
+                        <input type="number" name="default_variety_count" id="edit_variety" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Varsayılan Kap</label>
+                        <select name="default_container_type" id="edit_container" class="form-control">
+                            <option value="sefer_tasi">Sefer Tası</option>
+                            <option value="paket">Paket</option>
+                            <option value="kuvet">Küvet</option>
+                            <option value="tepsi">Tepsi</option>
+                            <option value="poset">Poşet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Varsayılan Porsiyon</label>
+                        <input type="number" name="default_portion_count" id="edit_portion" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Özel Notlar</label>
+                    <textarea name="special_notes" id="edit_notes" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editCustomerModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Güncelle</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editCustomer(id, name, contact, phone, telegram, address, lat, lng, variety, container, portion, notes) {
+    document.getElementById('editForm').action = '/customers/edit/' + id;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_contact_name').value = contact;
+    document.getElementById('edit_phone').value = phone;
+    document.getElementById('edit_telegram_chat_id').value = telegram;
+    document.getElementById('edit_address').value = address;
+    document.getElementById('edit_latitude').value = lat;
+    document.getElementById('edit_longitude').value = lng;
+    document.getElementById('edit_variety').value = variety;
+    document.getElementById('edit_container').value = container;
+    document.getElementById('edit_portion').value = portion;
+    document.getElementById('edit_notes').value = notes;
+    openModal('editCustomerModal');
+}
+</script>
+
+{% if google_maps_key %}
+<script>
+var addMap, addMarker, editMap, editMarker;
+var defaultCenter = {lat: 39.925, lng: 32.866}; // Ankara merkez
+
+function initMaps() {
+    // Add modal haritasi
+    var addMapEl = document.getElementById('addMap');
+    if (addMapEl) {
+        addMap = new google.maps.Map(addMapEl, {zoom: 12, center: defaultCenter});
+        addMap.addListener('click', function(e) {
+            var lat = e.latLng.lat();
+            var lng = e.latLng.lng();
+            document.getElementById('add_latitude').value = lat.toFixed(6);
+            document.getElementById('add_longitude').value = lng.toFixed(6);
+            if (addMarker) addMarker.setMap(null);
+            addMarker = new google.maps.Marker({position: e.latLng, map: addMap, draggable: true});
+            addMarker.addListener('dragend', function(e) {
+                document.getElementById('add_latitude').value = e.latLng.lat().toFixed(6);
+                document.getElementById('add_longitude').value = e.latLng.lng().toFixed(6);
+            });
+        });
+    }
+
+    // Edit modal haritasi
+    var editMapEl = document.getElementById('editMap');
+    if (editMapEl) {
+        editMap = new google.maps.Map(editMapEl, {zoom: 12, center: defaultCenter});
+        editMap.addListener('click', function(e) {
+            var lat = e.latLng.lat();
+            var lng = e.latLng.lng();
+            document.getElementById('edit_latitude').value = lat.toFixed(6);
+            document.getElementById('edit_longitude').value = lng.toFixed(6);
+            if (editMarker) editMarker.setMap(null);
+            editMarker = new google.maps.Marker({position: e.latLng, map: editMap, draggable: true});
+            editMarker.addListener('dragend', function(e) {
+                document.getElementById('edit_latitude').value = e.latLng.lat().toFixed(6);
+                document.getElementById('edit_longitude').value = e.latLng.lng().toFixed(6);
+            });
+        });
+    }
+}
+
+// Edit modalda mevcut koordinatlari haritada goster
+var origEditCustomer = window.editCustomer;
+window.editCustomer = function(id, name, contact, phone, telegram, address, lat, lng, variety, container, portion, notes) {
+    origEditCustomer(id, name, contact, phone, telegram, address, lat, lng, variety, container, portion, notes);
+    setTimeout(function() {
+        if (editMap) {
+            google.maps.event.trigger(editMap, 'resize');
+            if (lat && lng) {
+                var pos = {lat: parseFloat(lat), lng: parseFloat(lng)};
+                editMap.setCenter(pos);
+                editMap.setZoom(15);
+                if (editMarker) editMarker.setMap(null);
+                editMarker = new google.maps.Marker({position: pos, map: editMap, draggable: true});
+                editMarker.addListener('dragend', function(e) {
+                    document.getElementById('edit_latitude').value = e.latLng.lat().toFixed(6);
+                    document.getElementById('edit_longitude').value = e.latLng.lng().toFixed(6);
+                });
+            } else {
+                editMap.setCenter(defaultCenter);
+                editMap.setZoom(12);
+            }
+        }
+    }, 200);
+};
+
+// Add modal acilinca haritayi resize et
+var origOpenModal = window.openModal;
+window.openModal = function(id) {
+    origOpenModal(id);
+    setTimeout(function() {
+        if (id === 'addCustomerModal' && addMap) {
+            google.maps.event.trigger(addMap, 'resize');
+            addMap.setCenter(defaultCenter);
+        }
+    }, 200);
+};
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMaps" async defer></script>
+{% endif %}
+{% endblock %}

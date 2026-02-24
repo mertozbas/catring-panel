@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Satınalma{% endblock %}
+{% block page_title %}Satınalma / Mal Alım{% endblock %}
+
+{% block content %}
+<div class="tab-nav">
+    <a href="?tab=purchases" class="{% if tab == 'purchases' %}active{% endif %}">Satınalma Kayıtları</a>
+    <a href="?tab=suppliers" class="{% if tab == 'suppliers' %}active{% endif %}">Tedarikçiler</a>
+</div>
+
+{% if tab == 'purchases' %}
+<div class="toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addPurchaseModal')">+ Yeni Satınalma</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if purchases %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Tarih</th><th>Tedarikçi</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in purchases %}
+                    <tr>
+                        <td>{{ p.date }}</td>
+                        <td><strong>{{ p.supplier_name }}</strong></td>
+                        <td>{{ "%.2f"|format(p.total_amount) }} TL</td>
+                        <td><span class="badge badge-{% if p.status=='inspected' %}success{% elif p.status=='received' %}info{% else %}warning{% endif %}">{{ p.status }}</span></td>
+                        <td><a href="{{ url_for('purchasing.detail', purchase_id=p.id) }}" class="btn btn-sm btn-outline">Detay</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Satınalma kaydı yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addPurchaseModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Satınalma</h3>
+            <button class="modal-close" onclick="closeModal('addPurchaseModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('purchasing.add') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tedarikçi *</label>
+                    <select name="supplier_id" class="form-control" required>
+                        <option value="">Seçin...</option>
+                        {% for s in suppliers %}
+                        {% if s.is_active %}
+                        <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tarih *</label>
+                    <input type="date" name="date" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addPurchaseModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Oluştur</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% elif tab == 'suppliers' %}
+<div class="toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addSupplierModal')">+ Yeni Tedarikçi</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if suppliers %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Tedarikçi</th><th>İletişim</th><th>Telefon</th><th>Kategori</th><th>Durum</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in suppliers %}
+                    <tr>
+                        <td><strong>{{ s.name }}</strong></td>
+                        <td>{{ s.contact_name or '-' }}</td>
+                        <td>{{ s.phone or '-' }}</td>
+                        <td>{{ s.category or '-' }}</td>
+                        <td><span class="badge badge-{% if s.is_active %}success{% else %}secondary{% endif %}">{% if s.is_active %}Aktif{% else %}Pasif{% endif %}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Tedarikçi eklenmemiş.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addSupplierModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Tedarikçi</h3>
+            <button class="modal-close" onclick="closeModal('addSupplierModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('purchasing.add_supplier') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Firma Adı *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>İletişim Kişisi</label>
+                        <input type="text" name="contact_name" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Telefon</label>
+                        <input type="text" name="phone" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Kategori</label>
+                        <select name="category" class="form-control">
+                            <option value="">Seçin...</option>
+                            <option value="et">Et</option>
+                            <option value="sebze">Sebze/Meyve</option>
+                            <option value="kurubaklagil">Kuru Baklagil</option>
+                            <option value="sut_urunleri">Süt Ürünleri</option>
+                            <option value="baharat">Baharat</option>
+                            <option value="icecek">İçecek</option>
+                            <option value="diger">Diğer</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Adres</label>
+                    <textarea name="address" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addSupplierModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

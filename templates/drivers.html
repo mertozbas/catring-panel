@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Şoförler{% endblock %}
+{% block page_title %}Şoför Yönetimi{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addDriverModal')">+ Yeni Şoför</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if drivers %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ad Soyad</th>
+                        <th>Telefon</th>
+                        <th>Telegram ID</th>
+                        <th>Durum</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in drivers %}
+                    <tr>
+                        <td><strong>{{ d.name }}</strong></td>
+                        <td>{{ d.phone or '-' }}</td>
+                        <td>{{ d.telegram_chat_id or '-' }}</td>
+                        <td>
+                            {% if d.is_active %}
+                            <span class="badge badge-success">Aktif</span>
+                            {% else %}
+                            <span class="badge badge-secondary">Pasif</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline" onclick="editDriver({{ d.id }}, '{{ d.name }}', '{{ d.phone or '' }}', '{{ d.telegram_chat_id or '' }}')">Düzenle</button>
+                            {% if d.is_active %}
+                            <a href="{{ url_for('drivers.toggle', driver_id=d.id, active=0) }}" class="btn btn-sm btn-danger">Pasif</a>
+                            {% else %}
+                            <a href="{{ url_for('drivers.toggle', driver_id=d.id, active=1) }}" class="btn btn-sm btn-success">Aktif</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9951;</div>
+            <p>Henüz şoför eklenmemiş.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addDriverModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Şoför</h3>
+            <button class="modal-close" onclick="closeModal('addDriverModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('drivers.add') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Ad Soyad *</label>
+                    <input type="text" name="name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Telefon</label>
+                    <input type="text" name="phone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Telegram Chat ID</label>
+                    <input type="text" name="telegram_chat_id" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addDriverModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="editDriverModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Şoför Düzenle</h3>
+            <button class="modal-close" onclick="closeModal('editDriverModal')">&times;</button>
+        </div>
+        <form method="POST" id="editDriverForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Ad Soyad *</label>
+                    <input type="text" name="name" id="ed_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Telefon</label>
+                    <input type="text" name="phone" id="ed_phone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Telegram Chat ID</label>
+                    <input type="text" name="telegram_chat_id" id="ed_telegram" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editDriverModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Güncelle</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editDriver(id, name, phone, telegram) {
+    document.getElementById('editDriverForm').action = '/drivers/edit/' + id;
+    document.getElementById('ed_name').value = name;
+    document.getElementById('ed_phone').value = phone;
+    document.getElementById('ed_telegram').value = telegram;
+    openModal('editDriverModal');
+}
+</script>
+{% endblock %}

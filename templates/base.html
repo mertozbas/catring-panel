@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#e67e22">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Başak Yemek">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+    <title>{% block title %}Başak Yemek{% endblock %} - Catering Yönetim</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Başak Yemek</h2>
+                <small>Catering Yönetim Sistemi</small>
+            </div>
+            <ul class="sidebar-menu">
+                {% if allowed_blueprints == '__all__' or 'dashboard' in allowed_blueprints %}
+                <li><a href="{{ url_for('dashboard.index') }}" class="{% if request.blueprint == 'dashboard' %}active{% endif %}">
+                    <span class="icon">&#9632;</span> Dashboard
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'orders' in allowed_blueprints %}
+                <li><a href="{{ url_for('orders.index') }}" class="{% if request.blueprint == 'orders' %}active{% endif %}">
+                    <span class="icon">&#9998;</span> Siparişler
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'routes' in allowed_blueprints %}
+                <li><a href="{{ url_for('routes.index') }}" class="{% if request.blueprint == 'routes' %}active{% endif %}">
+                    <span class="icon">&#9873;</span> Rotalar
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'customers' in allowed_blueprints %}
+                <li><a href="{{ url_for('customers.index') }}" class="{% if request.blueprint == 'customers' %}active{% endif %}">
+                    <span class="icon">&#9734;</span> Müşteriler
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'drivers' in allowed_blueprints %}
+                <li><a href="{{ url_for('drivers.index') }}" class="{% if request.blueprint == 'drivers' %}active{% endif %}">
+                    <span class="icon">&#9951;</span> Şoförler
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'menu' in allowed_blueprints %}
+                <li><a href="{{ url_for('menu.index') }}" class="{% if request.blueprint == 'menu' %}active{% endif %}">
+                    <span class="icon">&#9749;</span> Haftalık Menü
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'kitchen' in allowed_blueprints %}
+                <li><a href="{{ url_for('kitchen.index') }}" class="{% if request.blueprint == 'kitchen' %}active{% endif %}">
+                    <span class="icon">&#9832;</span> Mutfak
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'driver_ui' in allowed_blueprints %}
+                <li><a href="{{ url_for('driver_ui.index') }}" class="{% if request.blueprint == 'driver_ui' %}active{% endif %}">
+                    <span class="icon">&#9951;</span> Şoför Paneli
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'inventory' in allowed_blueprints %}
+                <li><a href="{{ url_for('inventory.index') }}" class="{% if request.blueprint == 'inventory' %}active{% endif %}">
+                    <span class="icon">&#9638;</span> Depo
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'planning' in allowed_blueprints %}
+                <li><a href="{{ url_for('planning.index') }}" class="{% if request.blueprint == 'planning' %}active{% endif %}">
+                    <span class="icon">&#9776;</span> Malzeme Planlama
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'purchasing' in allowed_blueprints %}
+                <li><a href="{{ url_for('purchasing.index') }}" class="{% if request.blueprint == 'purchasing' %}active{% endif %}">
+                    <span class="icon">&#9733;</span> Satınalma
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'dietitian' in allowed_blueprints %}
+                <li><a href="{{ url_for('dietitian.index') }}" class="{% if request.blueprint == 'dietitian' %}active{% endif %}">
+                    <span class="icon">&#9883;</span> Diyetisyen
+                </a></li>
+                {% endif %}
+
+                {% if allowed_blueprints == '__all__' or 'erp' in allowed_blueprints %}
+                <li><a href="{{ url_for('erp.index') }}" class="{% if request.blueprint == 'erp' %}active{% endif %}">
+                    <span class="icon">&#8378;</span> Muhasebe / ERP
+                </a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <button class="menu-toggle" onclick="toggleSidebar()">&#9776;</button>
+                <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                <div class="top-bar-right">
+                    <span id="current-date"></span>
+                    {% if is_logged_in %}
+                    <span style="margin-left:15px;font-size:13px;color:#666;">
+                        {{ current_user.name }}
+                        <span class="badge" style="font-size:11px;padding:3px 8px;">{{ current_user.role_label }}</span>
+                    </span>
+                    <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline" style="margin-left:10px;font-size:12px;">Çıkış</a>
+                    {% endif %}
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="content-area">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

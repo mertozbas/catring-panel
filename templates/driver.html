@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Şoför Paneli{% endblock %}
+{% block page_title %}Şoför Paneli - {{ driver_name }}{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <strong>{{ driver_name }}</strong> &mdash; {{ today }}
+    </div>
+</div>
+
+{# Günün Menüsü #}
+{% if today_menu %}
+<div class="menu-info-card">
+    <strong>Bugünkü Menü:</strong>
+    {% for item in today_menu %}
+        {{ item.item_name }}{% if not loop.last %} | {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if routes %}
+    {# Günlük Rota Navigasyonu Butonu #}
+    {% if google_maps_key %}
+    <button type="button" onclick="startDailyRoute()" class="btn daily-route-btn">
+        🗺️ Günlük Rotayı Başlat
+    </button>
+    {% endif %}
+
+    {% for r in routes %}
+    <div class="route-card">
+        <div class="route-card-header">
+            <div>
+                {{ r.route_name or (r.driver_name + ' - ' + r.service_number|string + '. Servis') }}
+                <span class="badge badge-{% if r.status=='completed' %}success{% elif r.status=='in_progress' %}warning{% else %}info{% endif %}">
+                    {{ r.status }}
+                </span>
+            </div>
+            <div class="route-summary">
+                {% set orders_list = route_orders.get(r.id, []) %}
+                {% set delivered_count = orders_list|selectattr('status', 'equalto', 'delivered')|list|length %}
+                {% set total_count = orders_list|length %}
+                <span>{{ r.total_portions }} porsiyon</span>
+                {% if r.optimized_distance_km %}
+                <span>| {{ r.optimized_distance_km }} km, ~{{ r.optimized_duration_min }} dk</span>
+                {% endif %}
+                <span>| {{ delivered_count }}/{{ total_count }} teslim</span>
+            </div>
+        </div>
+        <div class="route-card-body">
+            {% if route_orders.get(r.id) %}
+                {% for o in route_orders[r.id] %}
+                <div class="delivery-item {% if o.status == 'delivered' %}delivery-done{% endif %}"
+                     data-lat="{{ o.latitude or '' }}" data-lng="{{ o.longitude or '' }}"
+                     data-status="{{ o.status }}" data-seq="{{ o.delivery_sequence or 999 }}">
+                    <div class="delivery-header">
+                        <div class="delivery-title">
+                            <h4>{{ o.delivery_sequence or '-' }}. {{ o.customer_name }}</h4>
+                            <span class="badge badge-{% if o.status=='delivered' %}success{% elif o.status=='cancelled' %}danger{% elif o.status=='ready' %}info{% else %}warning{% endif %}">
+                                {{ o.status }}
+                            </span>
+                        </div>
+                        <div class="delivery-count">{{ o.portion_count }}</div>
+                    </div>
+
+                    <div class="driver-order-detail">
+                        <div class="detail-row">
+                            <span class="detail-label">🍽️ Kap:</span>
+                            <span class="badge badge-{{ o.container_type }}">{{ o.container_type | replace('_',' ') | title }}</span>
+                            <span class="detail-sep">|</span>
+                            <span class="detail-label">Çeşit:</span>
+                            <span>{{ o.variety_count }}</span>
+                            {% if o.cutlery_needed %}
+                            <span class="detail-sep">|</span>
+                            <span>🍴 Çatal-Bıçak</span>
+                            {% endif %}
+                        </div>
+
+                        {% if o.portion_detail %}
+                        <div class="detail-row">
+                            <span class="detail-label">📝 Detay:</span>
+                            <span>{{ o.portion_detail }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if o.special_notes %}
+                        <div class="detail-row note-warning">
+                            <span class="detail-label">⚠️ Özel Not:</span>
+                            <span>{{ o.special_notes }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if o.customer_notes %}
+                        <div class="detail-row note-info">
+                            <span class="detail-label">💬 Müşteri:</span>
+                            <span>{{ o.customer_notes }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if o.extra_items %}
+                        <div class="detail-row">
+                            <span class="detail-label">🧺 Ekstra:</span>
+                            <span>{{ o.extra_items }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if o.address %}
+                        <div class="detail-row">
+                            <span class="detail-label">📍</span>
+                            <span>{{ o.address }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="delivery-actions">
+                        {% if o.latitude and o.longitude and google_maps_key %}
+                        <a href="https://www.google.com/maps/dir/?api=1&destination={{ o.latitude }},{{ o.longitude }}" target="_blank" class="btn btn-sm btn-navigate">📍 Navigasyon</a>
+                        {% endif %}
+
+                        {% if o.status != 'delivered' and o.status != 'cancelled' %}
+                        <form method="POST" action="{{ url_for('driver_ui.deliver', order_id=o.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-success btn-deliver">✅ Teslim Edildi</button>
+                        </form>
+                        {% elif o.status == 'delivered' %}
+                        <span class="badge badge-success" style="padding:8px 12px;">✓ Teslim Edildi</span>
+                        {% else %}
+                        <span class="badge badge-danger" style="padding:8px 12px;">İptal</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+
+            {% if r.status != 'completed' %}
+            <div style="margin-top:15px;text-align:center;">
+                <form method="POST" action="{{ url_for('driver_ui.complete_route', route_id=r.id) }}">
+                    <button type="submit" class="btn btn-success btn-deliver" onclick="return confirm('Rotayı tamamlamak istediğinize emin misiniz?')">🏁 Rotayı Tamamla</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {# Harita #}
+    {% if google_maps_key %}
+    <div class="card">
+        <div class="card-header"><h3>Rota Haritası</h3></div>
+        <div class="card-body">
+            <div id="map" style="width:100%;height:400px;border-radius:var(--radius);"></div>
+        </div>
+    </div>
+    {% endif %}
+
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <div class="icon">🚚</div>
+            <p>Bugün size atanmış rota bulunmuyor.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if google_maps_key and routes %}
+<script>
+function startDailyRoute() {
+    var items = document.querySelectorAll('.delivery-item');
+    var remaining = [];
+
+    items.forEach(function(item) {
+        var status = item.getAttribute('data-status');
+        var lat = item.getAttribute('data-lat');
+        var lng = item.getAttribute('data-lng');
+        var seq = parseInt(item.getAttribute('data-seq')) || 999;
+
+        if (status !== 'delivered' && status !== 'cancelled' && lat && lng) {
+            remaining.push({lat: lat, lng: lng, seq: seq});
+        }
+    });
+
+    if (remaining.length === 0) {
+        alert('Tüm teslimatlar tamamlandı! 🎉');
+        return;
+    }
+
+    // delivery_sequence'a göre sırala
+    remaining.sort(function(a, b) { return a.seq - b.seq; });
+
+    // Google Maps URL oluştur
+    var origin = remaining[0].lat + ',' + remaining[0].lng;
+    var destination = remaining[remaining.length - 1].lat + ',' + remaining[remaining.length - 1].lng;
+    var waypoints = '';
+
+    if (remaining.length > 2) {
+        var wpList = remaining.slice(1, -1);
+        // Google Maps max 10 waypoint (ücretsiz)
+        if (wpList.length > 10) wpList = wpList.slice(0, 10);
+        waypoints = '&waypoints=' + wpList.map(function(w) { return w.lat + ',' + w.lng; }).join('|');
+    } else if (remaining.length === 1) {
+        destination = origin;
+    }
+
+    var url = 'https://www.google.com/maps/dir/?api=1&origin=' + origin +
+              '&destination=' + destination + waypoints + '&travelmode=driving';
+    window.open(url, '_blank');
+}
+
+function initMap() {
+    var deliveredIcon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png';
+    var pendingIcon = 'https://maps.google.com/mapfiles/ms/icons/red-dot.png';
+
+    var locations = [
+        {% for r in routes %}
+            {% for o in route_orders.get(r.id, []) %}
+                {% if o.latitude and o.longitude %}
+                {lat: {{ o.latitude }}, lng: {{ o.longitude }}, name: "{{ o.customer_name }}", portion: {{ o.portion_count }}, status: "{{ o.status }}", seq: {{ o.delivery_sequence or 0 }}},
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    ];
+
+    if (locations.length === 0) return;
+
+    var map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 12,
+        center: locations[0]
+    });
+
+    var bounds = new google.maps.LatLngBounds();
+    locations.forEach(function(loc) {
+        var icon = loc.status === 'delivered' ? deliveredIcon : pendingIcon;
+        var marker = new google.maps.Marker({
+            position: {lat: loc.lat, lng: loc.lng},
+            map: map,
+            icon: icon,
+            title: (loc.seq || '?') + '. ' + loc.name + ' (' + loc.portion + ' porsiyon) - ' + loc.status
+        });
+        bounds.extend(marker.getPosition());
+    });
+    map.fitBounds(bounds);
+
+    // Rota çizgisi (iptal hariç)
+    var activeLocations = locations.filter(function(l) { return l.status !== 'cancelled'; });
+    if (activeLocations.length >= 2) {
+        var directionsService = new google.maps.DirectionsService();
+        var directionsRenderer = new google.maps.DirectionsRenderer({map: map, suppressMarkers: true});
+        var waypoints = activeLocations.slice(1, -1).map(function(loc) {
+            return {location: {lat: loc.lat, lng: loc.lng}, stopover: true};
+        });
+        directionsService.route({
+            origin: {lat: activeLocations[0].lat, lng: activeLocations[0].lng},
+            destination: {lat: activeLocations[activeLocations.length-1].lat, lng: activeLocations[activeLocations.length-1].lng},
+            waypoints: waypoints,
+            travelMode: 'DRIVING'
+        }, function(response, status) {
+            if (status === 'OK') directionsRenderer.setDirections(response);
+        });
+    }
+}
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap" async defer></script>
+{% endif %}
+{% endblock %}

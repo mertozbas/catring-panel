@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}Muhasebe / ERP{% endblock %}
+{% block page_title %}Muhasebe / ERP{% endblock %}
+
+{% block content %}
+<div class="tab-nav">
+    <a href="?tab=overview" class="{% if tab == 'overview' %}active{% endif %}">Genel Bakış</a>
+    <a href="?tab=invoices" class="{% if tab == 'invoices' %}active{% endif %}">Faturalar</a>
+    <a href="?tab=transactions" class="{% if tab == 'transactions' %}active{% endif %}">Gelir/Gider</a>
+    <a href="?tab=settings" class="{% if tab == 'settings' %}active{% endif %}">ERP Ayarları</a>
+</div>
+
+{% if tab == 'overview' %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value" style="color:var(--success);">{{ "%.2f"|format(summary.total_income or 0) }} TL</div>
+        <div class="stat-label">Bu Ay Gelir</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color:var(--danger);">{{ "%.2f"|format(summary.total_expense or 0) }} TL</div>
+        <div class="stat-label">Bu Ay Gider</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.2f"|format((summary.total_income or 0) - (summary.total_expense or 0)) }} TL</div>
+        <div class="stat-label">Net Kar</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Son İşlemler</h3></div>
+    <div class="card-body">
+        {% if recent_transactions %}
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Tarih</th><th>Tip</th><th>Kategori</th><th>Açıklama</th><th>Tutar</th></tr></thead>
+                <tbody>
+                    {% for t in recent_transactions %}
+                    <tr>
+                        <td>{{ t.date }}</td>
+                        <td><span class="badge badge-{% if t.type == 'income' %}success{% else %}danger{% endif %}">{{ 'Gelir' if t.type == 'income' else 'Gider' }}</span></td>
+                        <td>{{ t.category or '-' }}</td>
+                        <td>{{ t.description or '-' }}</td>
+                        <td><strong>{{ "%.2f"|format(t.amount) }} TL</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Henüz işlem yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+{% elif tab == 'invoices' %}
+<div class="toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addInvoiceModal')">+ Yeni Fatura</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if invoices %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Fatura No</th><th>Müşteri</th><th>Tarih</th><th>Porsiyon</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr>
+                </thead>
+                <tbody>
+                    {% for inv in invoices %}
+                    <tr>
+                        <td>{{ inv.invoice_number }}</td>
+                        <td><strong>{{ inv.customer_name or '-' }}</strong></td>
+                        <td>{{ inv.date }}</td>
+                        <td>{{ inv.total_portions }}</td>
+                        <td><strong>{{ "%.2f"|format(inv.total_amount) }} TL</strong></td>
+                        <td><span class="badge badge-{% if inv.status == 'paid' %}success{% elif inv.status == 'sent' %}info{% else %}warning{% endif %}">{{ inv.status }}</span></td>
+                        <td>
+                            {% if inv.status == 'draft' %}
+                            <a href="{{ url_for('erp.update_invoice_status', invoice_id=inv.id, status='sent') }}" class="btn btn-sm btn-info">Gönder</a>
+                            {% elif inv.status == 'sent' %}
+                            <a href="{{ url_for('erp.update_invoice_status', invoice_id=inv.id, status='paid') }}" class="btn btn-sm btn-success">Ödendi</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Fatura yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addInvoiceModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni Fatura</h3>
+            <button class="modal-close" onclick="closeModal('addInvoiceModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('erp.add_invoice') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Müşteri</label>
+                        <select name="customer_id" class="form-control">
+                            <option value="">Seçin...</option>
+                            {% for c in customers %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tarih *</label>
+                        <input type="date" name="date" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dönem Başlangıç</label>
+                        <input type="date" name="period_start" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Dönem Bitiş</label>
+                        <input type="date" name="period_end" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Toplam Porsiyon</label>
+                        <input type="number" name="total_portions" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Birim Fiyat (TL)</label>
+                        <input type="number" step="any" name="unit_price" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Toplam Tutar (TL)</label>
+                        <input type="number" step="any" name="total_amount" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>KDV (TL)</label>
+                        <input type="number" step="any" name="tax_amount" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Not</label>
+                    <textarea name="notes" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addInvoiceModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Oluştur</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% elif tab == 'transactions' %}
+<div class="toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+        <button class="btn btn-primary" onclick="openModal('addTransactionModal')">+ Yeni İşlem</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if recent_transactions %}
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Tarih</th><th>Tip</th><th>Kategori</th><th>Açıklama</th><th>Tutar</th></tr></thead>
+                <tbody>
+                    {% for t in recent_transactions %}
+                    <tr>
+                        <td>{{ t.date }}</td>
+                        <td><span class="badge badge-{% if t.type == 'income' %}success{% else %}danger{% endif %}">{{ 'Gelir' if t.type == 'income' else 'Gider' }}</span></td>
+                        <td>{{ t.category or '-' }}</td>
+                        <td>{{ t.description or '-' }}</td>
+                        <td><strong>{{ "%.2f"|format(t.amount) }} TL</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>İşlem yok.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="addTransactionModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Yeni İşlem</h3>
+            <button class="modal-close" onclick="closeModal('addTransactionModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('erp.add_transaction') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tip *</label>
+                        <select name="type" class="form-control" required>
+                            <option value="income">Gelir</option>
+                            <option value="expense">Gider</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Kategori</label>
+                        <select name="category" class="form-control">
+                            <option value="food_sale">Yemek Satışı</option>
+                            <option value="ingredient_purchase">Malzeme Alımı</option>
+                            <option value="salary">Maaş</option>
+                            <option value="rent">Kira</option>
+                            <option value="utility">Fatura (Elektrik/Su/Doğalgaz)</option>
+                            <option value="transport">Ulaşım</option>
+                            <option value="other">Diğer</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tutar (TL) *</label>
+                        <input type="number" step="any" name="amount" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tarih *</label>
+                        <input type="date" name="date" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Açıklama</label>
+                    <textarea name="description" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addTransactionModal')">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% elif tab == 'settings' %}
+<div class="card">
+    <div class="card-header"><h3>ERP Ayarları</h3></div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('erp.update_settings') }}">
+            <div class="form-group">
+                <label>ERP Modu</label>
+                <select name="erp_mode" class="form-control" id="erpMode" onchange="toggleErpFields()">
+                    <option value="builtin" {% if erp_settings and erp_settings.erp_mode == 'builtin' %}selected{% endif %}>Dahili ERP</option>
+                    <option value="external" {% if erp_settings and erp_settings.erp_mode == 'external' %}selected{% endif %}>Harici ERP</option>
+                </select>
+            </div>
+            <div id="externalFields" style="{% if not erp_settings or erp_settings.erp_mode != 'external' %}display:none;{% endif %}">
+                <div class="form-group">
+                    <label>Harici ERP Tipi</label>
+                    <input type="text" name="external_erp_type" class="form-control" value="{{ erp_settings.external_erp_type or '' if erp_settings else '' }}" placeholder="ERPNext, Odoo vb.">
+                </div>
+                <div class="form-group">
+                    <label>Harici ERP API URL</label>
+                    <input type="text" name="external_erp_url" class="form-control" value="{{ erp_settings.external_erp_url or '' if erp_settings else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" name="external_erp_api_key" class="form-control" value="{{ erp_settings.external_erp_api_key or '' if erp_settings else '' }}">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleErpFields() {
+    var mode = document.getElementById('erpMode').value;
+    document.getElementById('externalFields').style.display = mode === 'external' ? 'block' : 'none';
+}
+</script>
+{% endif %}
+{% endblock %}
